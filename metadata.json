@@ -1,0 +1,6 @@
+{
+  "name": "Ice Diamonds",
+  "description": "פלטפורמה מתקדמת לניהול פיננסי עבור עסק התכשיטים Ice Diamonds - מעקב הכנסות, הוצאות קבועות ומשתנות, חובות ומשלוחים.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
