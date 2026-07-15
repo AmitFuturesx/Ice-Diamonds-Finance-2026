@@ -21,7 +21,6 @@ export default function DebtsView({
   const [newName, setNewName] = useState('');
   const [newMonthlyPayment, setNewMonthlyPayment] = useState('');
   const [newCurrentBalance, setNewCurrentBalance] = useState('');
-  const [newOriginalAmount, setNewOriginalAmount] = useState('');
   const [newPaymentDate, setNewPaymentDate] = useState('');
   const [newStatus, setNewStatus] = useState<PaymentStatus>('לא שולם');
 
@@ -30,7 +29,6 @@ export default function DebtsView({
   const [editName, setEditName] = useState('');
   const [editMonthlyPayment, setEditMonthlyPayment] = useState('');
   const [editCurrentBalance, setEditCurrentBalance] = useState('');
-  const [editOriginalAmount, setEditOriginalAmount] = useState('');
   const [editPaymentDate, setEditPaymentDate] = useState('');
   const [editStatus, setEditStatus] = useState<PaymentStatus>('לא שולם');
 
@@ -41,14 +39,15 @@ export default function DebtsView({
 
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName || !newMonthlyPayment || !newCurrentBalance || !newOriginalAmount) return;
+    if (!newName || !newMonthlyPayment || !newCurrentBalance) return;
 
+    const startingBalance = Number(newCurrentBalance) || 0;
     await onSaveDebt({
       month_id: activeMonthId,
       name: newName,
       monthly_payment: Number(newMonthlyPayment) || 0,
-      current_balance: Number(newCurrentBalance) || 0,
-      original_amount: Number(newOriginalAmount) || 0,
+      current_balance: startingBalance,
+      original_amount: startingBalance, // Starting balance is the original principal
       payment_date: newPaymentDate || 'לא סומן',
       status: newStatus
     });
@@ -56,7 +55,6 @@ export default function DebtsView({
     setNewName('');
     setNewMonthlyPayment('');
     setNewCurrentBalance('');
-    setNewOriginalAmount('');
     setNewPaymentDate('');
     setNewStatus('לא שולם');
   };
@@ -66,7 +64,6 @@ export default function DebtsView({
     setEditName(debt.name);
     setEditMonthlyPayment(String(debt.monthly_payment));
     setEditCurrentBalance(String(debt.current_balance));
-    setEditOriginalAmount(String(debt.original_amount));
     setEditPaymentDate(debt.payment_date);
     setEditStatus(statusOf(debt));
   };
@@ -75,14 +72,14 @@ export default function DebtsView({
     setEditingId(null);
   };
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string, existingOriginal: number) => {
     await onSaveDebt({
       id,
       month_id: activeMonthId,
       name: editName,
       monthly_payment: Number(editMonthlyPayment) || 0,
       current_balance: Number(editCurrentBalance) || 0,
-      original_amount: Number(editOriginalAmount) || 0,
+      original_amount: existingOriginal, // Preserved — not editable in the UI
       payment_date: editPaymentDate,
       status: editStatus
     });
@@ -275,15 +272,14 @@ export default function DebtsView({
                 <th className="p-4 font-semibold w-[15%]">יתרת חוב נוכחית</th>
                 <th className="p-4 font-semibold w-[10%] text-center">יום בחודש לחיוב</th>
                 <th className="p-4 font-semibold text-center w-[12%]">סטטוס תשלום</th>
-                <th className="p-4 font-semibold w-[15%]">סכום מקורי (קרן)</th>
-                <th className="p-4 font-semibold text-center w-[12%]">התקדמות פירעון</th>
+                <th className="p-4 font-semibold text-center w-[15%]">התקדמות פירעון</th>
                 <th className="p-4 font-semibold text-center w-1/12">פעולות</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
               {visibleDebts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-zinc-600">
+                  <td colSpan={7} className="p-8 text-center text-zinc-600">
                     {debts.length === 0
                       ? 'אין חובות או התחייבויות פתוחים לחודש הנבחר.'
                       : 'אין חובות בסטטוס הנבחר.'}
@@ -394,21 +390,6 @@ export default function DebtsView({
                         )}
                       </td>
 
-                      {/* Original Principal */}
-                      <td className="p-4 font-mono text-zinc-400 text-xs">
-                        {isEditing ? (
-                          <input
-                            id={`edit-debt-original-${item.id}`}
-                            type="number"
-                            value={editOriginalAmount}
-                            onChange={(e) => setEditOriginalAmount(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none font-mono focus:border-green-500"
-                          />
-                        ) : (
-                          <span>{Number(item.original_amount).toLocaleString('he-IL')} ₪</span>
-                        )}
-                      </td>
-
                       {/* Progress visual */}
                       <td className="p-4">
                         <div className="space-y-1">
@@ -432,7 +413,7 @@ export default function DebtsView({
                             <>
                               <button
                                 id={`save-debt-${item.id}`}
-                                onClick={() => handleSaveEdit(item.id)}
+                                onClick={() => handleSaveEdit(item.id, item.original_amount)}
                                 className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
                                 title="שמור"
                               >
@@ -485,7 +466,7 @@ export default function DebtsView({
           הוספת התחייבות / הלוואה חדשה
         </h3>
 
-        <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+        <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="space-y-1">
             <label className="text-xs text-zinc-400 font-medium">גורם מממן / ספק ההלוואה *</label>
             <input
@@ -520,19 +501,6 @@ export default function DebtsView({
               required
               value={newCurrentBalance}
               onChange={(e) => setNewCurrentBalance(e.target.value)}
-              placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">סל הלוואה מקורי / קרן (₪) *</label>
-            <input
-              id="new-debt-original"
-              type="number"
-              required
-              value={newOriginalAmount}
-              onChange={(e) => setNewOriginalAmount(e.target.value)}
               placeholder="0"
               className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
             />
