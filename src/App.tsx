@@ -162,19 +162,21 @@ export default function App() {
       const monthName = HEBREW_MONTHS[newMonthNumber - 1];
       const added = await dbService.addMonth(monthName, newMonthYear, newMonthNumber);
 
-      // Pull the source month's data FRESH from the DB so the copy never depends
-      // on possibly-stale React state (which caused variable expenses to be missed).
+      // Build the template from the "fullest" existing month — the one with the
+      // most line items — so a new month always inherits the complete list,
+      // regardless of which month is currently selected. Fetched fresh from the DB.
       let srcFixed = fixedExpenses;
       let srcVariable = variableExpenses;
-      if (activeMonthId) {
-        try {
-          [srcFixed, srcVariable] = await Promise.all([
-            dbService.getFixedExpenses(activeMonthId),
-            dbService.getVariableExpenses(activeMonthId)
-          ]);
-        } catch {
-          // Fall back to whatever is in state if the fresh fetch fails
-        }
+      try {
+        const [fixedByMonth, variableByMonth] = await Promise.all([
+          Promise.all(months.map(m => dbService.getFixedExpenses(m.id))),
+          Promise.all(months.map(m => dbService.getVariableExpenses(m.id)))
+        ]);
+        // Pick the month that has the most items for each category
+        srcFixed = fixedByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcFixed);
+        srcVariable = variableByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcVariable);
+      } catch {
+        // Fall back to whatever is in state if the fresh fetch fails
       }
 
       // Carry the fixed expenses over (amounts kept — they are recurring/constant)
