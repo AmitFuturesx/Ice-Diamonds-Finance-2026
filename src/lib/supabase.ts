@@ -283,10 +283,12 @@ export const dbService = {
 
   async saveVariableExpense(expense: Omit<VariableExpense, 'id'> & { id?: string }): Promise<VariableExpense> {
     if (isLiveSupabase && supabaseClient) {
+      // An empty date ("unknown" billing day) must be stored as NULL, not ''
+      const payload: any = { ...expense, date: expense.date ? expense.date : null };
       if (expense.id && !expense.id.startsWith('ve_')) {
         const { data, error } = await supabaseClient
           .from('variable_expenses')
-          .update(expense)
+          .update(payload)
           .eq('id', expense.id)
           .select();
         if (error) throw error;
@@ -294,7 +296,7 @@ export const dbService = {
       } else {
         const { data, error } = await supabaseClient
           .from('variable_expenses')
-          .insert([expense])
+          .insert([payload])
           .select();
         if (error) throw error;
         return data[0];
