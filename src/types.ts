@@ -14,6 +14,7 @@ export interface FixedExpense {
   amount: number;
   notes: string;
   status: PaymentStatus;
+  payment_date?: string; // Billing day of month ("10"/"15"/"19") or "" for unknown
 }
 
 export interface VariableExpense {

@@ -187,7 +187,8 @@ export default function App() {
             name: fe.name,
             amount: fe.amount,
             notes: fe.notes,
-            status: 'לא שולם'
+            status: 'לא שולם',
+            payment_date: fe.payment_date
           })
         )
       );

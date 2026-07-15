@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FixedExpense, PaymentStatus } from '../types';
-import { Plus, Trash2, Edit2, Check, X, FileSpreadsheet, Save } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, CalendarClock } from 'lucide-react';
 
 interface FixedExpensesViewProps {
   expenses: FixedExpense[];
@@ -8,6 +8,13 @@ interface FixedExpensesViewProps {
   onSaveExpense: (expense: Omit<FixedExpense, 'id'> & { id?: string }) => Promise<void>;
   onDeleteExpense: (id: string) => Promise<void>;
 }
+
+// A billing day is a day-of-month, or 'unknown' when not set
+type BillingDay = number | 'unknown';
+const BILLING_DAYS = [10, 15, 19];
+const BILLING_OPTIONS: BillingDay[] = [10, 15, 19, 'unknown'];
+
+type StatusFilter = 'all' | PaymentStatus;
 
 export default function FixedExpensesView({
   expenses,
@@ -20,13 +27,39 @@ export default function FixedExpensesView({
   const [newAmount, setNewAmount] = useState('');
   const [newNotes, setNewNotes] = useState('');
   const [newStatus, setNewStatus] = useState<PaymentStatus>('לא שולם');
-  
+  const [newBillingDay, setNewBillingDay] = useState<BillingDay>(10);
+
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<PaymentStatus>('לא שולם');
+
+  // Which status the table is filtered to (via the clickable summary blocks)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  // Convert a billing-day value to the stored text ("" for unknown)
+  const billingDayToStored = (day: BillingDay) => (day === 'unknown' ? '' : String(day));
+
+  // Read the billing day from a stored value; empty => 'unknown'
+  const getDay = (stored?: string): BillingDay => {
+    if (!stored) return 'unknown';
+    const d = parseInt(stored, 10);
+    return isNaN(d) ? 'unknown' : d;
+  };
+
+  // Snap a stored day to one of the allowed options
+  const nearestBillingDay = (day: BillingDay): BillingDay => {
+    if (day === 'unknown') return 'unknown';
+    if (BILLING_DAYS.includes(day)) return day;
+    return BILLING_DAYS.reduce((prev, curr) =>
+      Math.abs(curr - day) < Math.abs(prev - day) ? curr : prev
+    );
+  };
+
+  const billingDayLabel = (day: BillingDay) =>
+    day === 'unknown' ? 'לא ידוע' : `${day} לחודש`;
 
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,14 +70,15 @@ export default function FixedExpensesView({
       name: newName,
       amount: Number(newAmount) || 0,
       notes: newNotes,
-      status: newStatus
+      status: newStatus,
+      payment_date: billingDayToStored(newBillingDay)
     });
 
-    // Reset controls
     setNewName('');
     setNewAmount('');
     setNewNotes('');
     setNewStatus('לא שולם');
+    setNewBillingDay(10);
   };
 
   const startEdit = (exp: FixedExpense) => {
@@ -59,14 +93,15 @@ export default function FixedExpensesView({
     setEditingId(null);
   };
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string, currentPaymentDate?: string) => {
     await onSaveExpense({
       id,
       month_id: activeMonthId,
       name: editName,
       amount: Number(editAmount) || 0,
       notes: editNotes,
-      status: editStatus
+      status: editStatus,
+      payment_date: currentPaymentDate
     });
     setEditingId(null);
   };
@@ -78,16 +113,33 @@ export default function FixedExpensesView({
       'שולם חלקית': 'לא שולם',
       'לא שולם': 'שולם'
     };
-    const nextStatus = nextStatusMap[item.status];
-    await onSaveExpense({
-      ...item,
-      status: nextStatus
-    });
+    await onSaveExpense({ ...item, status: nextStatusMap[item.status] });
   };
 
-  const totalFixed = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  // Clickable billing-day cycle: 10 -> 15 -> 19 -> לא ידוע -> 10
+  const handleCycleBillingDay = async (item: FixedExpense) => {
+    const currentDay = nearestBillingDay(getDay(item.payment_date));
+    const idx = BILLING_OPTIONS.indexOf(currentDay);
+    const nextDay = BILLING_OPTIONS[(idx + 1) % BILLING_OPTIONS.length];
+    await onSaveExpense({ ...item, payment_date: billingDayToStored(nextDay) });
+  };
 
-  // Styling helper for the status badge
+  // Totals per status
+  const sumFor = (status: PaymentStatus) =>
+    expenses.filter((e) => e.status === status).reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+  const paidTotal = sumFor('שולם');
+  const partialTotal = sumFor('שולם חלקית');
+  const unpaidTotal = sumFor('לא שולם');
+  const remainingTotal = partialTotal + unpaidTotal;
+  const totalFixed = paidTotal + partialTotal + unpaidTotal;
+
+  const visibleExpenses =
+    statusFilter === 'all' ? expenses : expenses.filter((e) => e.status === statusFilter);
+
+  const fmtCurrency = (n: number) =>
+    n.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' });
+
   const getStatusBadgeStyles = (status: PaymentStatus) => {
     switch (status) {
       case 'שולם':
@@ -99,61 +151,156 @@ export default function FixedExpensesView({
     }
   };
 
+  const summaryCards: {
+    key: StatusFilter;
+    label: string;
+    amount: number;
+    count: number;
+    activeClasses: string;
+    accentText: string;
+  }[] = [
+    {
+      key: 'all',
+      label: 'סה״כ הכל',
+      amount: totalFixed,
+      count: expenses.length,
+      activeClasses: 'border-[#22c55e] bg-[#22c55e]/10',
+      accentText: 'text-[#22c55e]'
+    },
+    {
+      key: 'שולם',
+      label: 'שולם',
+      amount: paidTotal,
+      count: expenses.filter((e) => e.status === 'שולם').length,
+      activeClasses: 'border-green-500 bg-green-500/10',
+      accentText: 'text-green-400'
+    },
+    {
+      key: 'שולם חלקית',
+      label: 'שולם חלקית',
+      amount: partialTotal,
+      count: expenses.filter((e) => e.status === 'שולם חלקית').length,
+      activeClasses: 'border-amber-500 bg-amber-500/10',
+      accentText: 'text-amber-400'
+    },
+    {
+      key: 'לא שולם',
+      label: 'נותר לשלם',
+      amount: remainingTotal,
+      count: expenses.filter((e) => e.status === 'לא שולם').length,
+      activeClasses: 'border-red-500 bg-red-500/10',
+      accentText: 'text-red-400'
+    }
+  ];
+
   return (
     <div className="space-y-6">
-      
-      {/* Header Summary Info card */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#121212] border border-zinc-800 p-6 rounded-2xl gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white">הוצאות קבועות</h2>
-          <p className="text-sm text-zinc-500 mt-1">
-            מעקב אחר תשלומים גבוהים בעלי מחזור קבוע (שכירות, ארנונה, תקשורת וכדומה)
-          </p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 px-5 py-3 rounded-xl text-center">
-          <span className="text-xs text-zinc-500 block">סה״כ הוצאות קבועות</span>
-          <span className="text-2xl font-black font-mono text-[#22c55e]">
-            {totalFixed.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
-          </span>
-        </div>
+
+      {/* Header */}
+      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
+        <h2 className="text-xl font-bold text-white">הוצאות קבועות</h2>
+        <p className="text-sm text-zinc-500 mt-1">
+          מעקב אחר תשלומים גבוהים בעלי מחזור קבוע (שכירות, ארנונה, תקשורת וכדומה)
+        </p>
       </div>
 
-      {/* Main Table Wrapper */}
+      {/* Clickable status summary blocks (act as filters) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((card) => {
+          const isActive = statusFilter === card.key;
+          return (
+            <button
+              key={card.key}
+              id={`fixed-filter-card-${card.key}`}
+              onClick={() => setStatusFilter(card.key)}
+              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
+                isActive ? card.activeClasses : 'border-zinc-800 bg-[#121212] hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
+                <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-full">
+                  {card.count}
+                </span>
+              </div>
+              <span className={`text-xl font-black font-mono ${card.accentText}`}>
+                {fmtCurrency(card.amount)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {statusFilter !== 'all' && (
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span>מסונן לפי: <span className="font-semibold text-white">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
+          <button
+            id="fixed-clear-filter-btn"
+            onClick={() => setStatusFilter('all')}
+            className="text-[#22c55e] hover:underline"
+          >
+            הצג הכל
+          </button>
+        </div>
+      )}
+
+      {/* Main Table */}
       <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 bg-zinc-900/30 border-b border-zinc-800/80 flex justify-between items-center">
           <span className="text-xs font-bold text-zinc-300 tracking-wider">טבלת הוצאות קבועות</span>
-          <span className="text-xs text-zinc-500">לחץ על תג סטטוס כדי לשנותו במהירות</span>
+          <span className="text-xs text-zinc-500">לחץ על תג הסטטוס או יום החיוב כדי לשנותם</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="border-b border-zinc-800 text-xs text-zinc-400 bg-zinc-900/10">
+                <th className="p-4 font-semibold text-center w-[15%]">יום חיוב</th>
                 <th className="p-4 font-semibold w-1/4">שם ההוצאה</th>
                 <th className="p-4 font-semibold w-1/6">סכום</th>
-                <th className="p-4 font-semibold w-1/3">הערות ופירוט</th>
-                <th className="p-4 font-semibold text-center w-1/6">סטטוס תשלום</th>
-                <th className="p-4 font-semibold text-center w-1/8">פעולות</th>
+                <th className="p-4 font-semibold w-1/4">הערות ופירוט</th>
+                <th className="p-4 font-semibold text-center w-[15%]">סטטוס תשלום</th>
+                <th className="p-4 font-semibold text-center w-[10%]">פעולות</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
-              {expenses.length === 0 ? (
+              {visibleExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-zinc-600">
-                     אין הוצאות קבועות רשומות לחודש הנבחר.
+                  <td colSpan={6} className="p-8 text-center text-zinc-600">
+                    {expenses.length === 0
+                      ? 'אין הוצאות קבועות רשומות לחודש הנבחר.'
+                      : 'אין הוצאות בסטטוס הנבחר.'}
                   </td>
                 </tr>
               ) : (
-                expenses.map((exp) => {
+                visibleExpenses.map((exp) => {
                   const isEditing = editingId === exp.id;
+                  const billingDay = nearestBillingDay(getDay(exp.payment_date));
 
                   return (
-                    <tr 
-                      key={exp.id} 
+                    <tr
+                      key={exp.id}
                       className={`hover:bg-zinc-900/35 transition-colors duration-200 ${
                         isEditing ? 'bg-zinc-900/60' : ''
                       }`}
                     >
+                      {/* Billing Day Col (clickable cycle) */}
+                      <td className="p-4 text-center">
+                        <button
+                          id={`fixed-billing-day-${exp.id}`}
+                          onClick={() => handleCycleBillingDay(exp)}
+                          title="לחץ לשינוי יום החיוב"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95 ${
+                            billingDay === 'unknown'
+                              ? 'bg-zinc-800/60 text-zinc-400 border border-zinc-700'
+                              : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                          }`}
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          {billingDayLabel(billingDay)}
+                        </button>
+                      </td>
+
                       {/* Name Col */}
                       <td className="p-4">
                         {isEditing ? (
@@ -181,7 +328,7 @@ export default function FixedExpensesView({
                           />
                         ) : (
                           <span className="font-semibold text-zinc-200">
-                            {Number(exp.amount).toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
+                            {fmtCurrency(Number(exp.amount))}
                           </span>
                         )}
                       </td>
@@ -234,7 +381,7 @@ export default function FixedExpensesView({
                             <>
                               <button
                                 id={`save-btn-${exp.id}`}
-                                onClick={() => handleSaveEdit(exp.id)}
+                                onClick={() => handleSaveEdit(exp.id, exp.payment_date)}
                                 className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
                                 title="שמור שינויים"
                               >
@@ -286,8 +433,30 @@ export default function FixedExpensesView({
           <Plus className="w-5 h-5 text-[#22c55e]" />
           הוספת שורה חדשה להוצאות הקבועות
         </h3>
-        
-        <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+
+        <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          {/* Billing Day selector */}
+          <div className="space-y-1">
+            <label className="text-xs text-zinc-400 font-medium">יום חיוב *</label>
+            <div className="flex gap-1.5">
+              {BILLING_OPTIONS.map((day) => (
+                <button
+                  key={String(day)}
+                  type="button"
+                  id={`new-fixed-billing-day-${day}`}
+                  onClick={() => setNewBillingDay(day)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer border ${
+                    newBillingDay === day
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  {day === 'unknown' ? 'לא ידוע' : day}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs text-zinc-400 font-medium">שם ההוצאה *</label>
             <input
@@ -340,7 +509,7 @@ export default function FixedExpensesView({
                 <option value="שולם">שולם</option>
               </select>
             </div>
-            
+
             <button
               id="add-fixed-btn"
               type="submit"
