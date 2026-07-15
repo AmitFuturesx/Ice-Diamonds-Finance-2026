@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import { VariableExpense, PaymentStatus } from '../types';
-import { Plus, Trash2, Edit2, Check, X, CalendarDays } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, CalendarClock } from 'lucide-react';
 
 interface VariableExpensesViewProps {
   expenses: VariableExpense[];
   activeMonthId: string;
+  monthYear?: number;
+  monthNumber?: number;
   onSaveExpense: (expense: Omit<VariableExpense, 'id'> & { id?: string }) => Promise<void>;
   onDeleteExpense: (id: string) => Promise<void>;
 }
 
+// The available billing days a charge can be deducted on
+const BILLING_DAYS = [10, 15, 19];
+
+type StatusFilter = 'all' | PaymentStatus;
+
 export default function VariableExpensesView({
   expenses,
   activeMonthId,
+  monthYear,
+  monthNumber,
   onSaveExpense,
   onDeleteExpense
 }: VariableExpensesViewProps) {
@@ -19,7 +28,7 @@ export default function VariableExpensesView({
   const [newName, setNewName] = useState('');
   const [newAmount, setNewAmount] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [newDate, setNewDate] = useState('');
+  const [newBillingDay, setNewBillingDay] = useState<number>(10);
   const [newStatus, setNewStatus] = useState<PaymentStatus>('לא שולם');
 
   // Inline edit state
@@ -27,22 +36,49 @@ export default function VariableExpensesView({
   const [editName, setEditName] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editNotes, setEditNotes] = useState('');
-  const [editDate, setEditDate] = useState('');
   const [editStatus, setEditStatus] = useState<PaymentStatus>('לא שולם');
+
+  // Which status the table is filtered to (via the clickable summary blocks)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  // Build a real date string (YYYY-MM-DD) from the active month + chosen billing day
+  const buildDateFromDay = (day: number) => {
+    const y = monthYear || new Date().getFullYear();
+    const m = monthNumber || (new Date().getMonth() + 1);
+    return `${y}-${pad(m)}-${pad(day)}`;
+  };
+
+  // Extract the billing day (day-of-month) from a stored date string
+  const getDayFromDate = (dateStr: string): number => {
+    if (!dateStr) return 10;
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const d = parseInt(parts[2], 10);
+      if (!isNaN(d)) return d;
+    }
+    return 10;
+  };
+
+  // Snap any day to the closest of the allowed billing days (for display of legacy data)
+  const nearestBillingDay = (day: number): number => {
+    if (BILLING_DAYS.includes(day)) return day;
+    return BILLING_DAYS.reduce((prev, curr) =>
+      Math.abs(curr - day) < Math.abs(prev - day) ? curr : prev
+    );
+  };
 
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newAmount) return;
-
-    // Default to current date if none provided
-    const dateToSave = newDate || new Date().toISOString().split('T')[0];
 
     await onSaveExpense({
       month_id: activeMonthId,
       name: newName,
       amount: Number(newAmount) || 0,
       notes: newNotes,
-      date: dateToSave,
+      date: buildDateFromDay(newBillingDay),
       status: newStatus
     });
 
@@ -50,7 +86,7 @@ export default function VariableExpensesView({
     setNewName('');
     setNewAmount('');
     setNewNotes('');
-    setNewDate('');
+    setNewBillingDay(10);
     setNewStatus('לא שולם');
   };
 
@@ -59,7 +95,6 @@ export default function VariableExpensesView({
     setEditName(exp.name);
     setEditAmount(String(exp.amount));
     setEditNotes(exp.notes);
-    setEditDate(exp.date);
     setEditStatus(exp.status);
   };
 
@@ -67,14 +102,14 @@ export default function VariableExpensesView({
     setEditingId(null);
   };
 
-  const handleSaveEdit = async (id: string) => {
+  const handleSaveEdit = async (id: string, currentDate: string) => {
     await onSaveExpense({
       id,
       month_id: activeMonthId,
       name: editName,
       amount: Number(editAmount) || 0,
       notes: editNotes,
-      date: editDate,
+      date: currentDate,
       status: editStatus
     });
     setEditingId(null);
@@ -87,14 +122,37 @@ export default function VariableExpensesView({
       'שולם חלקית': 'לא שולם',
       'לא שולם': 'שולם'
     };
-    const nextStatus = nextStatusMap[item.status];
-    await onSaveExpense({
-      ...item,
-      status: nextStatus
-    });
+    await onSaveExpense({ ...item, status: nextStatusMap[item.status] });
   };
 
-  const totalVariable = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+  // Clickable billing-day cycle: 10 -> 15 -> 19 -> 10
+  const handleCycleBillingDay = async (item: VariableExpense) => {
+    const currentDay = nearestBillingDay(getDayFromDate(item.date));
+    const idx = BILLING_DAYS.indexOf(currentDay);
+    const nextDay = BILLING_DAYS[(idx + 1) % BILLING_DAYS.length];
+    await onSaveExpense({ ...item, date: buildDateFromDay(nextDay) });
+  };
+
+  // Totals per status (from the full list, ignoring the active filter)
+  const sumFor = (status: PaymentStatus) =>
+    expenses
+      .filter((e) => e.status === status)
+      .reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+
+  const paidTotal = sumFor('שולם');
+  const partialTotal = sumFor('שולם חלקית');
+  const unpaidTotal = sumFor('לא שולם');
+  const remainingTotal = partialTotal + unpaidTotal; // Still owed
+  const totalVariable = paidTotal + partialTotal + unpaidTotal;
+
+  // Apply the active filter to the table rows
+  const visibleExpenses =
+    statusFilter === 'all'
+      ? expenses
+      : expenses.filter((e) => e.status === statusFilter);
+
+  const fmtCurrency = (n: number) =>
+    n.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' });
 
   // Styling helper for the status badge
   const getStatusBadgeStyles = (status: PaymentStatus) => {
@@ -108,51 +166,114 @@ export default function VariableExpensesView({
     }
   };
 
-  // Format date helper (DD/MM/YYYY)
-  const formatDateString = (dateStr: string) => {
-    if (!dateStr) return '—';
-    try {
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`;
-      }
-      return dateStr;
-    } catch {
-      return dateStr;
+  // Summary cards config (each is a clickable filter)
+  const summaryCards: {
+    key: StatusFilter;
+    label: string;
+    amount: number;
+    count: number;
+    activeClasses: string;
+    accentText: string;
+  }[] = [
+    {
+      key: 'all',
+      label: 'סה״כ הכל',
+      amount: totalVariable,
+      count: expenses.length,
+      activeClasses: 'border-[#22c55e] bg-[#22c55e]/10',
+      accentText: 'text-[#22c55e]'
+    },
+    {
+      key: 'שולם',
+      label: 'שולם',
+      amount: paidTotal,
+      count: expenses.filter((e) => e.status === 'שולם').length,
+      activeClasses: 'border-green-500 bg-green-500/10',
+      accentText: 'text-green-400'
+    },
+    {
+      key: 'שולם חלקית',
+      label: 'שולם חלקית',
+      amount: partialTotal,
+      count: expenses.filter((e) => e.status === 'שולם חלקית').length,
+      activeClasses: 'border-amber-500 bg-amber-500/10',
+      accentText: 'text-amber-400'
+    },
+    {
+      key: 'לא שולם',
+      label: 'נותר לשלם',
+      amount: remainingTotal,
+      count: expenses.filter((e) => e.status === 'לא שולם').length,
+      activeClasses: 'border-red-500 bg-red-500/10',
+      accentText: 'text-red-400'
     }
-  };
+  ];
 
   return (
     <div className="space-y-6">
-      
-      {/* Header Summary Info card */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-[#121212] border border-zinc-800 p-6 rounded-2xl gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white">הוצאות משתנות</h2>
-          <p className="text-sm text-zinc-500 mt-1">
-            מעקב אחר תשלומים גמישים ורכישות מתחלפות, חומרי גלם, פרסומות, תיקונים מיוחדים ועוד
-          </p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 px-5 py-3 rounded-xl text-center">
-          <span className="text-xs text-zinc-500 block">סה״כ הוצאות משתנות</span>
-          <span className="text-2xl font-black font-mono text-[#22c55e]">
-            {totalVariable.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
-          </span>
-        </div>
+
+      {/* Header */}
+      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
+        <h2 className="text-xl font-bold text-white">הוצאות משתנות</h2>
+        <p className="text-sm text-zinc-500 mt-1">
+          מעקב אחר תשלומים גמישים ורכישות מתחלפות, חומרי גלם, פרסומות, תיקונים מיוחדים ועוד
+        </p>
       </div>
 
-      {/* Main Table Wrapper */}
+      {/* Clickable status summary blocks (act as filters) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {summaryCards.map((card) => {
+          const isActive = statusFilter === card.key;
+          return (
+            <button
+              key={card.key}
+              id={`filter-card-${card.key}`}
+              onClick={() => setStatusFilter(card.key)}
+              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
+                isActive
+                  ? card.activeClasses
+                  : 'border-zinc-800 bg-[#121212] hover:border-zinc-700'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
+                <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-full">
+                  {card.count}
+                </span>
+              </div>
+              <span className={`text-xl font-black font-mono ${card.accentText}`}>
+                {fmtCurrency(card.amount)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {statusFilter !== 'all' && (
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span>מסונן לפי: <span className="font-semibold text-white">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
+          <button
+            id="clear-filter-btn"
+            onClick={() => setStatusFilter('all')}
+            className="text-[#22c55e] hover:underline"
+          >
+            הצג הכל
+          </button>
+        </div>
+      )}
+
+      {/* Main Table */}
       <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-4 bg-zinc-900/30 border-b border-zinc-800/80 flex justify-between items-center">
           <span className="text-xs font-bold text-zinc-300 tracking-wider">טבלת הוצאות משתנות</span>
-          <span className="text-xs text-zinc-500">לחץ על תג סטטוס כדי לשנותו במהירות</span>
+          <span className="text-xs text-zinc-500">לחץ על תג הסטטוס או יום החיוב כדי לשנותם</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
               <tr className="border-b border-zinc-800 text-xs text-zinc-400 bg-zinc-900/10">
-                <th className="p-4 font-semibold w-[15%]">תאריך</th>
+                <th className="p-4 font-semibold text-center w-[15%]">יום חיוב</th>
                 <th className="p-4 font-semibold w-1/4">שם ההוצאה</th>
                 <th className="p-4 font-semibold w-1/6">סכום</th>
                 <th className="p-4 font-semibold w-1/4">הערות ופירוט</th>
@@ -161,39 +282,37 @@ export default function VariableExpensesView({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
-              {expenses.length === 0 ? (
+              {visibleExpenses.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-zinc-600">
-                     אין הוצאות משתנות רשומות לחודש הנבחר.
+                    {expenses.length === 0
+                      ? 'אין הוצאות משתנות רשומות לחודש הנבחר.'
+                      : 'אין הוצאות בסטטוס הנבחר.'}
                   </td>
                 </tr>
               ) : (
-                expenses.map((exp) => {
+                visibleExpenses.map((exp) => {
                   const isEditing = editingId === exp.id;
+                  const billingDay = nearestBillingDay(getDayFromDate(exp.date));
 
                   return (
-                    <tr 
-                      key={exp.id} 
+                    <tr
+                      key={exp.id}
                       className={`hover:bg-zinc-900/35 transition-colors duration-200 ${
                         isEditing ? 'bg-zinc-900/60' : ''
                       }`}
                     >
-                      {/* Date Col */}
-                      <td className="p-4 font-mono text-zinc-400">
-                        {isEditing ? (
-                          <input
-                            id={`edit-date-${exp.id}`}
-                            type="date"
-                            value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1.5 text-xs text-white w-full outline-none focus:border-green-500 font-mono"
-                          />
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5">
-                            <CalendarDays className="w-3.5 h-3.5 text-zinc-500" />
-                            {formatDateString(exp.date)}
-                          </span>
-                        )}
+                      {/* Billing Day Col (clickable cycle 10/15/19) */}
+                      <td className="p-4 text-center">
+                        <button
+                          id={`billing-day-${exp.id}`}
+                          onClick={() => handleCycleBillingDay(exp)}
+                          title="לחץ לשינוי יום החיוב"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95 bg-sky-950/40 text-sky-300 border border-sky-500/30"
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          {billingDay} לחודש
+                        </button>
                       </td>
 
                       {/* Name Col */}
@@ -223,7 +342,7 @@ export default function VariableExpensesView({
                           />
                         ) : (
                           <span className="font-semibold text-zinc-200">
-                            {Number(exp.amount).toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
+                            {fmtCurrency(Number(exp.amount))}
                           </span>
                         )}
                       </td>
@@ -276,7 +395,7 @@ export default function VariableExpensesView({
                             <>
                               <button
                                 id={`save-btn-${exp.id}`}
-                                onClick={() => handleSaveEdit(exp.id)}
+                                onClick={() => handleSaveEdit(exp.id, exp.date)}
                                 className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
                                 title="שמור שינויים"
                               >
@@ -322,24 +441,34 @@ export default function VariableExpensesView({
         </div>
       </div>
 
-      {/* Add New Row Form Box */}
+      {/* Add New Row Form */}
       <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
         <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
           <Plus className="w-5 h-5 text-[#22c55e]" />
           הוספת שורה חדשה להוצאות המשתנות
         </h3>
-        
+
         <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+          {/* Billing Day selector */}
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">תאריך הרכישה *</label>
-            <input
-              id="new-var-date"
-              type="date"
-              required
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
-            />
+            <label className="text-xs text-zinc-400 font-medium">יום חיוב *</label>
+            <div className="flex gap-1.5">
+              {BILLING_DAYS.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  id={`new-billing-day-${day}`}
+                  onClick={() => setNewBillingDay(day)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer border ${
+                    newBillingDay === day
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  {day}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -394,7 +523,7 @@ export default function VariableExpensesView({
                 <option value="שולם">שולם</option>
               </select>
             </div>
-            
+
             <button
               id="add-var-btn"
               type="submit"

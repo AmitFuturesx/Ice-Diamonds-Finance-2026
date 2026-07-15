@@ -510,9 +510,11 @@ export default function App() {
               )}
 
               {activePage === 'variable_expenses' && (
-                <VariableExpensesView 
+                <VariableExpensesView
                   expenses={variableExpenses}
                   activeMonthId={activeMonthId}
+                  monthYear={activeMonthObject?.year}
+                  monthNumber={activeMonthObject?.month_number}
                   onSaveExpense={handleSaveVariableExpense}
                   onDeleteExpense={handleDeleteVariableExpense}
                 />
