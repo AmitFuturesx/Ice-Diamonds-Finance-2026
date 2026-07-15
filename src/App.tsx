@@ -163,6 +163,7 @@ export default function App() {
       const added = await dbService.addMonth(monthName, newMonthYear, newMonthNumber);
 
       // Carry the fixed expenses of the currently active month into the new month
+      // (amounts kept — fixed expenses are recurring and constant)
       await Promise.all(
         fixedExpenses.map(fe =>
           dbService.saveFixedExpense({
@@ -170,6 +171,21 @@ export default function App() {
             name: fe.name,
             amount: fe.amount,
             notes: fe.notes,
+            status: 'לא שולם'
+          })
+        )
+      );
+
+      // Carry the variable expenses as a template: keep the name, billing day and
+      // notes, but ZERO the amount so it's filled in fresh each month.
+      await Promise.all(
+        variableExpenses.map(ve =>
+          dbService.saveVariableExpense({
+            month_id: added.id,
+            name: ve.name,
+            amount: 0,
+            notes: ve.notes,
+            date: ve.date,
             status: 'לא שולם'
           })
         )
