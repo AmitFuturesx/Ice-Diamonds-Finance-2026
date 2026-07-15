@@ -35,6 +35,8 @@ import {
   Sparkles,
   Menu,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Landmark
 } from 'lucide-react';
 
@@ -619,39 +621,60 @@ export default function App() {
             </p>
 
             <form onSubmit={handleAddMonthSubmit} className="space-y-4 pt-1">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] text-gray-400 font-medium">חודש *</label>
-                  <select
-                    id="new-mon-num-input"
-                    required
-                    value={newMonthNumber}
-                    onChange={(e) => setNewMonthNumber(Number(e.target.value))}
-                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all cursor-pointer"
+              {/* Year stepper with arrows */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-gray-400 font-medium">שנה</label>
+                <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 rounded-xl px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setNewMonthYear((y) => Math.max(new Date().getFullYear(), y - 1))}
+                    disabled={newMonthYear <= new Date().getFullYear()}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="שנה קודמת"
                   >
-                    {HEBREW_MONTHS.map((name, idx) => (
-                      <option key={idx} value={idx + 1} className="bg-[#1c1c1c] text-white">
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                  <span className="text-lg font-black font-mono text-white select-none">{newMonthYear}</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewMonthYear((y) => y + 1)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    title="שנה הבאה"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
                 </div>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] text-gray-400 font-medium">שנה *</label>
-                  <select
-                    id="new-mon-year-input"
-                    required
-                    value={newMonthYear}
-                    onChange={(e) => setNewMonthYear(Number(e.target.value))}
-                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all cursor-pointer"
-                  >
-                    {YEAR_OPTIONS.map((y) => (
-                      <option key={y} value={y} className="bg-[#1c1c1c] text-white">
-                        {y}
-                      </option>
-                    ))}
-                  </select>
+              {/* Month grid picker */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-gray-400 font-medium">חודש</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {HEBREW_MONTHS.map((name, idx) => {
+                    const monthNum = idx + 1;
+                    const isSelected = newMonthNumber === monthNum;
+                    const alreadyExists = months.some(
+                      (m) => m.year === newMonthYear && m.month_number === monthNum
+                    );
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setNewMonthNumber(monthNum)}
+                        disabled={alreadyExists}
+                        title={alreadyExists ? 'חודש זה כבר קיים' : name}
+                        className={`py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 border ${
+                          isSelected
+                            ? 'bg-[#22c55e] text-black border-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+                            : alreadyExists
+                            ? 'bg-transparent text-gray-600 border-white/5 cursor-not-allowed line-through'
+                            : 'bg-[#1a1a1a] text-gray-300 border-white/10 hover:border-[#22c55e]/50 hover:text-white cursor-pointer'
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
