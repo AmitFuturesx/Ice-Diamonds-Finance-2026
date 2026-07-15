@@ -162,10 +162,24 @@ export default function App() {
       const monthName = HEBREW_MONTHS[newMonthNumber - 1];
       const added = await dbService.addMonth(monthName, newMonthYear, newMonthNumber);
 
-      // Carry the fixed expenses of the currently active month into the new month
-      // (amounts kept — fixed expenses are recurring and constant)
+      // Pull the source month's data FRESH from the DB so the copy never depends
+      // on possibly-stale React state (which caused variable expenses to be missed).
+      let srcFixed = fixedExpenses;
+      let srcVariable = variableExpenses;
+      if (activeMonthId) {
+        try {
+          [srcFixed, srcVariable] = await Promise.all([
+            dbService.getFixedExpenses(activeMonthId),
+            dbService.getVariableExpenses(activeMonthId)
+          ]);
+        } catch {
+          // Fall back to whatever is in state if the fresh fetch fails
+        }
+      }
+
+      // Carry the fixed expenses over (amounts kept — they are recurring/constant)
       await Promise.all(
-        fixedExpenses.map(fe =>
+        srcFixed.map(fe =>
           dbService.saveFixedExpense({
             month_id: added.id,
             name: fe.name,
@@ -176,10 +190,10 @@ export default function App() {
         )
       );
 
-      // Carry the variable expenses as a template: keep the name, billing day and
+      // Carry the variable expenses as a template: keep name, billing day and
       // notes, but ZERO the amount so it's filled in fresh each month.
       await Promise.all(
-        variableExpenses.map(ve =>
+        srcVariable.map(ve =>
           dbService.saveVariableExpense({
             month_id: added.id,
             name: ve.name,
