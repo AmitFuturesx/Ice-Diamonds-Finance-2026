@@ -40,6 +40,15 @@ import {
 
 type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries';
 
+// Hebrew month names, indexed by month number - 1
+const HEBREW_MONTHS = [
+  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+];
+
+// Year options: from the current year and 100 years forward (fully future-proof)
+const YEAR_OPTIONS = Array.from({ length: 101 }, (_, i) => new Date().getFullYear() + i);
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -50,9 +59,9 @@ export default function App() {
   const [activeMonthId, setActiveMonthId] = useState<string>('');
   const [isLoadingMonths, setIsLoadingMonths] = useState(true);
   const [isAddingMonthModal, setIsAddingMonthModal] = useState(false);
-  const [newMonthName, setNewMonthName] = useState('');
-  const [newMonthYear, setNewMonthYear] = useState('2026');
-  const [newMonthNumber, setNewMonthNumber] = useState('5');
+  const [newMonthYear, setNewMonthYear] = useState<number>(new Date().getFullYear());
+  const [newMonthNumber, setNewMonthNumber] = useState<number>(new Date().getMonth() + 1);
+  const [isCreatingMonth, setIsCreatingMonth] = useState(false);
 
   // Content state for active month
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
@@ -134,23 +143,44 @@ export default function App() {
     setCurrentUser(null);
   };
 
-  // Add virtual month flow
+  // Add a new month via the month + year picker.
+  // Fixed expenses carry over (with their amounts, reset to "לא שולם");
+  // variable expenses start empty so each month is filled in fresh.
   const handleAddMonthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMonthName) return;
 
+    // Prevent duplicate month/year entries
+    if (months.some(m => m.year === newMonthYear && m.month_number === newMonthNumber)) {
+      alert('החודש הזה כבר קיים ברשימה');
+      return;
+    }
+
+    setIsCreatingMonth(true);
     try {
-      const added = await dbService.addMonth(
-        newMonthName,
-        Number(newMonthYear) || 2026,
-        Number(newMonthNumber) || 4
+      const monthName = HEBREW_MONTHS[newMonthNumber - 1];
+      const added = await dbService.addMonth(monthName, newMonthYear, newMonthNumber);
+
+      // Carry the fixed expenses of the currently active month into the new month
+      await Promise.all(
+        fixedExpenses.map(fe =>
+          dbService.saveFixedExpense({
+            month_id: added.id,
+            name: fe.name,
+            amount: fe.amount,
+            notes: fe.notes,
+            status: 'לא שולם'
+          })
+        )
       );
+
       setMonths(prev => [...prev, added]);
       setActiveMonthId(added.id);
       setIsAddingMonthModal(false);
-      setNewMonthName('');
     } catch (err) {
+      console.error(err);
       alert('שגיאה ביצירת חודש פעילות');
+    } finally {
+      setIsCreatingMonth(false);
     }
   };
 
@@ -349,11 +379,13 @@ export default function App() {
                 {isLoadingMonths ? (
                   <option className="bg-[#1a1a1a]">נטען...</option>
                 ) : (
-                  months.map((m) => (
-                    <option key={m.id} value={m.id} className="bg-[#1c1c1c] text-white">
-                      {m.name} {m.year}
-                    </option>
-                  ))
+                  [...months]
+                    .sort((a, b) => a.year - b.year || a.month_number - b.month_number)
+                    .map((m) => (
+                      <option key={m.id} value={m.id} className="bg-[#1c1c1c] text-white">
+                        {m.name} {m.year}
+                      </option>
+                    ))
                 )}
               </select>
               <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
@@ -583,50 +615,43 @@ export default function App() {
               הוספת חודש שקיפות חדש
             </h3>
             <p className="text-xs text-gray-400 leading-snug">
-              הוסף חודש פעילות במאגר הנתונים. המערכת תתחיל לסנכרן דוחות, הוצאות והכנסות רלוונטיות לחודש זה.
+              בחר חודש ושנה. ההוצאות הקבועות יועתקו אוטומטית עם הסכומים שלהן, וההוצאות המשתנות יתחילו ריקות למילוי מחדש.
             </p>
 
             <form onSubmit={handleAddMonthSubmit} className="space-y-4 pt-1">
-              <div className="space-y-1">
-                <label className="text-[11px] text-gray-400 font-medium">שם חודש (בעברית) *</label>
-                <input
-                  id="new-mon-name-input"
-                  type="text"
-                  required
-                  placeholder="לדוג׳ יולי, אוגוסט"
-                  value={newMonthName}
-                  onChange={(e) => setNewMonthName(e.target.value)}
-                  className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] text-gray-400 font-medium">שנה *</label>
-                  <input
-                    id="new-mon-year-input"
-                    type="number"
+                  <label className="text-[11px] text-gray-400 font-medium">חודש *</label>
+                  <select
+                    id="new-mon-num-input"
                     required
-                    placeholder="2026"
-                    value={newMonthYear}
-                    onChange={(e) => setNewMonthYear(e.target.value)}
-                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono placeholder-gray-600 focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all"
-                  />
+                    value={newMonthNumber}
+                    onChange={(e) => setNewMonthNumber(Number(e.target.value))}
+                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all cursor-pointer"
+                  >
+                    {HEBREW_MONTHS.map((name, idx) => (
+                      <option key={idx} value={idx + 1} className="bg-[#1c1c1c] text-white">
+                        {name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] text-gray-400 font-medium">מספר חודש (1-12) *</label>
-                  <input
-                    id="new-mon-num-input"
-                    type="number"
+                  <label className="text-[11px] text-gray-400 font-medium">שנה *</label>
+                  <select
+                    id="new-mon-year-input"
                     required
-                    min="1"
-                    max="12"
-                    placeholder="7"
-                    value={newMonthNumber}
-                    onChange={(e) => setNewMonthNumber(e.target.value)}
-                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono placeholder-gray-600 focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all"
-                  />
+                    value={newMonthYear}
+                    onChange={(e) => setNewMonthYear(Number(e.target.value))}
+                    className="w-full bg-[#1a1a1a] border border-white/10 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-[#22c55e]/70 focus:ring-1 focus:ring-[#22c55e]/20 transition-all cursor-pointer"
+                  >
+                    {YEAR_OPTIONS.map((y) => (
+                      <option key={y} value={y} className="bg-[#1c1c1c] text-white">
+                        {y}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -634,9 +659,10 @@ export default function App() {
                 <button
                   id="submit-new-mon"
                   type="submit"
-                  className="flex-1 bg-[#22c55e] hover:bg-emerald-400 text-black font-extrabold py-2.5 px-3 rounded-xl text-xs transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:scale-[1.02]"
+                  disabled={isCreatingMonth}
+                  className="flex-1 bg-[#22c55e] hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-extrabold py-2.5 px-3 rounded-xl text-xs transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:scale-[1.02]"
                 >
-                  הוסף חודש
+                  {isCreatingMonth ? 'יוצר חודש...' : 'הוסף חודש'}
                 </button>
                 <button
                   id="close-mon-modal"
