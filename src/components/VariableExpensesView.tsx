@@ -11,8 +11,13 @@ interface VariableExpensesViewProps {
   onDeleteExpense: (id: string) => Promise<void>;
 }
 
+// A billing day is a day-of-month, or 'unknown' when the date isn't set yet
+type BillingDay = number | 'unknown';
+
 // The available billing days a charge can be deducted on
 const BILLING_DAYS = [10, 15, 19];
+// Full cycle including the "unknown" option
+const BILLING_OPTIONS: BillingDay[] = [10, 15, 19, 'unknown'];
 
 type StatusFilter = 'all' | PaymentStatus;
 
@@ -28,7 +33,7 @@ export default function VariableExpensesView({
   const [newName, setNewName] = useState('');
   const [newAmount, setNewAmount] = useState('');
   const [newNotes, setNewNotes] = useState('');
-  const [newBillingDay, setNewBillingDay] = useState<number>(10);
+  const [newBillingDay, setNewBillingDay] = useState<BillingDay>(10);
   const [newStatus, setNewStatus] = useState<PaymentStatus>('לא שולם');
 
   // Inline edit state
@@ -43,31 +48,38 @@ export default function VariableExpensesView({
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
-  // Build a real date string (YYYY-MM-DD) from the active month + chosen billing day
-  const buildDateFromDay = (day: number) => {
+  // Build a real date string from the active month + chosen billing day.
+  // 'unknown' saves an empty date (no known billing day).
+  const buildDateFromDay = (day: BillingDay) => {
+    if (day === 'unknown') return '';
     const y = monthYear || new Date().getFullYear();
     const m = monthNumber || (new Date().getMonth() + 1);
     return `${y}-${pad(m)}-${pad(day)}`;
   };
 
-  // Extract the billing day (day-of-month) from a stored date string
-  const getDayFromDate = (dateStr: string): number => {
-    if (!dateStr) return 10;
+  // Extract the billing day from a stored date string; empty date => 'unknown'
+  const getDayFromDate = (dateStr: string): BillingDay => {
+    if (!dateStr) return 'unknown';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
       const d = parseInt(parts[2], 10);
       if (!isNaN(d)) return d;
     }
-    return 10;
+    return 'unknown';
   };
 
-  // Snap any day to the closest of the allowed billing days (for display of legacy data)
-  const nearestBillingDay = (day: number): number => {
+  // Snap a stored day to one of the allowed options (for display of legacy data)
+  const nearestBillingDay = (day: BillingDay): BillingDay => {
+    if (day === 'unknown') return 'unknown';
     if (BILLING_DAYS.includes(day)) return day;
     return BILLING_DAYS.reduce((prev, curr) =>
       Math.abs(curr - day) < Math.abs(prev - day) ? curr : prev
     );
   };
+
+  // Label for a billing day value
+  const billingDayLabel = (day: BillingDay) =>
+    day === 'unknown' ? 'לא ידוע' : `${day} לחודש`;
 
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,11 +137,11 @@ export default function VariableExpensesView({
     await onSaveExpense({ ...item, status: nextStatusMap[item.status] });
   };
 
-  // Clickable billing-day cycle: 10 -> 15 -> 19 -> 10
+  // Clickable billing-day cycle: 10 -> 15 -> 19 -> לא ידוע -> 10
   const handleCycleBillingDay = async (item: VariableExpense) => {
     const currentDay = nearestBillingDay(getDayFromDate(item.date));
-    const idx = BILLING_DAYS.indexOf(currentDay);
-    const nextDay = BILLING_DAYS[(idx + 1) % BILLING_DAYS.length];
+    const idx = BILLING_OPTIONS.indexOf(currentDay);
+    const nextDay = BILLING_OPTIONS[(idx + 1) % BILLING_OPTIONS.length];
     await onSaveExpense({ ...item, date: buildDateFromDay(nextDay) });
   };
 
@@ -302,16 +314,20 @@ export default function VariableExpensesView({
                         isEditing ? 'bg-zinc-900/60' : ''
                       }`}
                     >
-                      {/* Billing Day Col (clickable cycle 10/15/19) */}
+                      {/* Billing Day Col (clickable cycle 10/15/19/לא ידוע) */}
                       <td className="p-4 text-center">
                         <button
                           id={`billing-day-${exp.id}`}
                           onClick={() => handleCycleBillingDay(exp)}
                           title="לחץ לשינוי יום החיוב"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95 bg-sky-950/40 text-sky-300 border border-sky-500/30"
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95 ${
+                            billingDay === 'unknown'
+                              ? 'bg-zinc-800/60 text-zinc-400 border border-zinc-700'
+                              : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                          }`}
                         >
                           <CalendarClock className="w-3.5 h-3.5" />
-                          {billingDay} לחודש
+                          {billingDayLabel(billingDay)}
                         </button>
                       </td>
 
@@ -453,9 +469,9 @@ export default function VariableExpensesView({
           <div className="space-y-1">
             <label className="text-xs text-zinc-400 font-medium">יום חיוב *</label>
             <div className="flex gap-1.5">
-              {BILLING_DAYS.map((day) => (
+              {BILLING_OPTIONS.map((day) => (
                 <button
-                  key={day}
+                  key={String(day)}
                   type="button"
                   id={`new-billing-day-${day}`}
                   onClick={() => setNewBillingDay(day)}
@@ -465,7 +481,7 @@ export default function VariableExpensesView({
                       : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700'
                   }`}
                 >
-                  {day}
+                  {day === 'unknown' ? 'לא ידוע' : day}
                 </button>
               ))}
             </div>
