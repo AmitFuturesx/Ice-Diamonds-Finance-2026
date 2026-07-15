@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Debt, PaymentStatus } from '../types';
-import { Plus, Trash2, Edit2, Check, X, ShieldCheck, Landmark } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, ShieldCheck, Landmark, CalendarClock } from 'lucide-react';
 
 interface DebtsViewProps {
   debts: Debt[];
@@ -270,7 +270,7 @@ export default function DebtsView({
                 <th className="p-4 font-semibold w-1/6">גורם מלווה / ספק</th>
                 <th className="p-4 font-semibold w-[13%]">החזר חודשי</th>
                 <th className="p-4 font-semibold w-[15%]">יתרת חוב נוכחית</th>
-                <th className="p-4 font-semibold w-[10%] text-center">יום בחודש לחיוב</th>
+                <th className="p-4 font-semibold w-[13%] text-center">יום בחודש לחיוב</th>
                 <th className="p-4 font-semibold text-center w-[12%]">סטטוס תשלום</th>
                 <th className="p-4 font-semibold text-center w-[15%]">התקדמות פירעון</th>
                 <th className="p-4 font-semibold text-center w-1/12">פעולות</th>
@@ -349,7 +349,7 @@ export default function DebtsView({
                       </td>
 
                       {/* Payment Date */}
-                      <td className="p-4 text-center font-mono">
+                      <td className="p-4 text-center">
                         {isEditing ? (
                           <input
                             id={`edit-debt-date-${item.id}`}
@@ -359,8 +359,17 @@ export default function DebtsView({
                             className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-20 outline-none text-center focus:border-green-500"
                           />
                         ) : (
-                          <span className="bg-zinc-900 border border-zinc-800/85 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400">
-                             ב-{item.payment_date} לחודש
+                          <span
+                            className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold ${
+                              !item.payment_date || item.payment_date === 'לא סומן'
+                                ? 'bg-zinc-800/60 text-zinc-400 border border-zinc-700'
+                                : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                            }`}
+                          >
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            {!item.payment_date || item.payment_date === 'לא סומן'
+                              ? 'לא ידוע'
+                              : `${item.payment_date} לחודש`}
                           </span>
                         )}
                       </td>

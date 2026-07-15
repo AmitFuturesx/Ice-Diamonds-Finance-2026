@@ -167,14 +167,29 @@ export default function App() {
       // regardless of which month is currently selected. Fetched fresh from the DB.
       let srcFixed = fixedExpenses;
       let srcVariable = variableExpenses;
+      // Debts carry forward from the PREVIOUS month with a "smart" balance reduction
+      let srcDebts: Debt[] = [];
       try {
-        const [fixedByMonth, variableByMonth] = await Promise.all([
+        const [fixedByMonth, variableByMonth, debtsByMonth] = await Promise.all([
           Promise.all(months.map(m => dbService.getFixedExpenses(m.id))),
-          Promise.all(months.map(m => dbService.getVariableExpenses(m.id)))
+          Promise.all(months.map(m => dbService.getVariableExpenses(m.id))),
+          Promise.all(months.map(m => dbService.getDebts(m.id)))
         ]);
         // Pick the month that has the most items for each category
         srcFixed = fixedByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcFixed);
         srcVariable = variableByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcVariable);
+
+        // For debts, use the closest EARLIER month that has debts, so the balance
+        // reduction chains month-by-month (June -> July -> ...).
+        const newOrdinal = newMonthYear * 12 + newMonthNumber;
+        let bestOrd = -1;
+        months.forEach((m, i) => {
+          const ord = m.year * 12 + m.month_number;
+          if (ord < newOrdinal && debtsByMonth[i].length > 0 && ord > bestOrd) {
+            bestOrd = ord;
+            srcDebts = debtsByMonth[i];
+          }
+        });
       } catch {
         // Fall back to whatever is in state if the fresh fetch fails
       }
@@ -206,6 +221,27 @@ export default function App() {
             status: 'לא שולם'
           })
         )
+      );
+
+      // Carry debts forward with the smart reduction: new balance = previous
+      // balance minus the monthly payment (floored at 0). Original principal,
+      // monthly payment and billing day stay the same; status resets to unpaid.
+      await Promise.all(
+        srcDebts.map(d => {
+          const reducedBalance = Math.max(
+            0,
+            (Number(d.current_balance) || 0) - (Number(d.monthly_payment) || 0)
+          );
+          return dbService.saveDebt({
+            month_id: added.id,
+            name: d.name,
+            monthly_payment: Number(d.monthly_payment) || 0,
+            current_balance: reducedBalance,
+            original_amount: Number(d.original_amount) || 0,
+            payment_date: d.payment_date,
+            status: 'לא שולם'
+          });
+        })
       );
 
       setMonths(prev => [...prev, added]);
