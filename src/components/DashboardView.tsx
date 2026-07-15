@@ -48,9 +48,18 @@ export default function DashboardView({
   const netBalance = totalIncome - totalExpenses;
   const isPositive = netBalance >= 0;
 
-  // Deliveries VAT note calculations
-  const rawDeliveriesSum = deliveries.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
-  const deliveriesWithVat = rawDeliveriesSum * 1.17; // +17% VAT
+  // Payment status across all obligations (fixed + variable use `amount`, debts use `monthly_payment`)
+  const debtStatusOf = (d: Debt) => d.status || 'לא שולם';
+  const paidThisMonth =
+    fixedExpenses.filter(e => e.status === 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
+    variableExpenses.filter(e => e.status === 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
+    debts.filter(d => debtStatusOf(d) === 'שולם').reduce((a, c) => a + (Number(c.monthly_payment) || 0), 0);
+  const remainingThisMonth =
+    fixedExpenses.filter(e => e.status !== 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
+    variableExpenses.filter(e => e.status !== 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
+    debts.filter(d => debtStatusOf(d) !== 'שולם').reduce((a, c) => a + (Number(c.monthly_payment) || 0), 0);
+  const totalObligations = paidThisMonth + remainingThisMonth;
+  const paidPercent = totalObligations > 0 ? (paidThisMonth / totalObligations) * 100 : 0;
 
   // Percentage breakdown of expenses
   const totalAllocated = totalFixed + totalVariable + totalDebts;
@@ -127,32 +136,43 @@ export default function DashboardView({
           </div>
         </div>
 
-        {/* Small Highlight Bento Widget: Deliveries Tracker info */}
+        {/* Small Highlight Bento Widget: Payment status this month */}
         <div className="bg-[#111] border border-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs text-gray-400 font-medium block">שליחויות והפצה</span>
-              <h3 className="text-lg font-bold text-gray-200 mt-0.5">עלות הפצה מרוכזת</h3>
+              <span className="text-xs text-gray-400 font-medium block">מצב תשלומים החודש</span>
+              <h3 className="text-lg font-bold text-gray-200 mt-0.5">כמה שולם וכמה נותר</h3>
             </div>
             <div className="p-3 bg-white/5 border border-white/5 text-[#22c55e] rounded-xl">
-              <Truck className="w-5 h-5" />
+              <CreditCard className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="bg-[#22c55e]/10 border border-[#22c55e]/20 rounded-xl p-3">
+              <div className="text-xs text-gray-400">שולם</div>
+              <div className="text-xl font-black text-[#22c55e] font-mono tracking-tight mt-0.5">
+                {paidThisMonth.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+              <div className="text-xs text-gray-400">נותר לשלם</div>
+              <div className="text-xl font-black text-rose-500 font-mono tracking-tight mt-0.5">
+                {remainingThisMonth.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+              </div>
             </div>
           </div>
 
           <div className="mt-4">
-            <div className="text-xs text-gray-400">סה״כ משלוחים ללא מע״מ</div>
-            <div className="text-lg font-bold text-gray-200 mt-0.5">
-              {rawDeliveriesSum.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
+            <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
+              <div
+                className="h-full rounded-full bg-[#22c55e] shadow-[0_0_10px_rgba(34,197,94,0.4)] transition-all duration-500"
+                style={{ width: `${paidPercent}%` }}
+              ></div>
             </div>
-            
-            <div className="text-xs text-gray-400 mt-2">סה״כ משלוחים כולל מע״מ (17%)</div>
-            <div className="text-2xl font-black text-[#22c55e] font-mono tracking-tight mt-0.5">
-              {deliveriesWithVat.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
+            <div className="text-xs text-gray-400 text-center mt-2 font-medium">
+              {paidPercent.toFixed(0)}% מההתחייבויות החודש שולמו
             </div>
-          </div>
-
-          <div className="text-xs text-gray-400 bg-white/5 p-2.5 rounded-lg border border-white/5 text-center mt-3 font-medium">
-             {deliveries.length} שליחויות בוצעו החודש
           </div>
         </div>
       </div>
