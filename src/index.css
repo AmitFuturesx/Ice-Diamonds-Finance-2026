@@ -34,6 +34,12 @@ input, select, textarea {
   background: #22c55e;
 }
 
+/* Mobile drawer slide-in animation (from the right for RTL) */
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* =====================================================================
    MOBILE RESPONSIVENESS — applies ONLY to screens ≤767px.
    Desktop (≥768px) is completely untouched by everything below.

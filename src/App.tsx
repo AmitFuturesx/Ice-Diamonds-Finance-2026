@@ -34,6 +34,7 @@ import {
   Flame, 
   Sparkles,
   Menu,
+  X,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -55,6 +56,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [activePage, setActivePage] = useState<ActivePage>('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Month select parameters
   const [months, setMonths] = useState<Month[]>([]);
@@ -423,7 +425,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 flex flex-col pb-24 md:pb-0 font-sans antialiased text-right">
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 flex flex-col font-sans antialiased text-right">
       
       {/* 1. Header (Brand, Sticky month selector, and User panel) */}
       <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-8 border-b border-white/10 bg-[#0d0d0d]">
@@ -494,15 +496,15 @@ export default function App() {
             </button>
           </div>
 
-          {/* Micro logout for mobile layout */}
+          {/* Mobile: hamburger menu trigger */}
           <div className="flex md:hidden items-center gap-2">
-            <button 
-              id="mob-logout"
-              onClick={handleLogout}
-              className="p-2 bg-[#1a1a1a] border border-white/5 text-gray-400 hover:text-rose-400 rounded-full transition-colors cursor-pointer"
-              title="יציאה מהחשבון"
+            <button
+              id="mob-menu-toggle"
+              onClick={() => setMobileNavOpen(true)}
+              className="p-2 bg-[#1a1a1a] border border-white/5 text-[#22c55e] hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+              title="תפריט"
             >
-              <LogOut className="w-4 h-4" />
+              <Menu className="w-5 h-5" />
             </button>
           </div>
 
@@ -655,27 +657,82 @@ export default function App() {
 
       </div>
 
-      {/* 4. Bottom Tab Navigation - Mobile only */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-[#0d0d0d] border-t border-white/10 py-2.5 px-2 md:hidden flex justify-around items-center shadow-2xl backdrop-blur-md">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activePage === item.id;
+      {/* 4. Mobile side drawer navigation (opened via hamburger) */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setMobileNavOpen(false)}
+          ></div>
 
-          return (
-            <button
-              id={`mob-nav-${item.id}`}
-              key={item.id}
-              onClick={() => setActivePage(item.id as ActivePage)}
-              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all rounded-lg cursor-pointer ${
-                isActive ? 'text-[#22c55e] font-bold scale-105' : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Icon className="w-5 h-5 mb-0.5 shrink-0" />
-              <span className="text-[9px] truncate tracking-tighter">{item.label}</span>
-            </button>
-          );
-        })}
-      </footer>
+          {/* Drawer panel (slides in from the right for RTL) */}
+          <div className="absolute top-0 right-0 h-full w-72 max-w-[82%] bg-[#0d0d0d] border-l border-white/10 shadow-2xl flex flex-col animate-[slideIn_0.2s_ease-out]">
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-5 h-16 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <BrandLogo size={34} className="shrink-0" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-extrabold text-white leading-none">ICE DIAMONDS</span>
+                  <span className="text-[10px] text-[#22c55e]">מערכת ניהול כספים</span>
+                </div>
+              </div>
+              <button
+                id="drawer-close"
+                onClick={() => setMobileNavOpen(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
+                title="סגור"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activePage === item.id;
+                return (
+                  <button
+                    id={`drawer-nav-${item.id}`}
+                    key={item.id}
+                    onClick={() => {
+                      setActivePage(item.id as ActivePage);
+                      setMobileNavOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm text-right transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-semibold'
+                        : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Drawer footer: user + logout */}
+            <div className="p-4 border-t border-white/10 space-y-3">
+              <div className="flex items-center gap-2.5 px-1">
+                <div className="w-9 h-9 rounded-full bg-[#22c55e] flex items-center justify-center font-black text-black text-xs select-none shrink-0">
+                  {currentUser?.email ? currentUser.email.substring(0, 2).toUpperCase() : 'ID'}
+                </div>
+                <span className="font-mono text-xs text-zinc-400 truncate">{currentUser?.email}</span>
+              </div>
+              <button
+                id="drawer-logout"
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-gray-300 hover:text-rose-400 bg-[#1a1a1a] hover:bg-rose-950/20 border border-white/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>יציאה מהחשבון</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 5. Add Month Modal Popup */}
       {isAddingMonthModal && (
