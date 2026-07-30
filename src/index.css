@@ -33,3 +33,50 @@ input, select, textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: #22c55e;
 }
+
+/* =====================================================================
+   MOBILE RESPONSIVENESS — applies ONLY to screens ≤767px.
+   Desktop (≥768px) is completely untouched by everything below.
+   ===================================================================== */
+@media (max-width: 767px) {
+  /* Any container that directly wraps a table becomes horizontally
+     scrollable, so wide tables scroll as intact units instead of
+     squishing, wrapping, or getting clipped by rounded cards. */
+  div:has(> table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Keep tables laid out (no column squishing); they scroll if wider. */
+  table {
+    min-width: 600px;
+  }
+
+  /* Tighter cell padding so more fits on screen before scrolling. */
+  table th,
+  table td {
+    padding: 0.6rem 0.7rem !important;
+  }
+
+  /* Header cells never wrap mid-word. */
+  table thead th {
+    white-space: nowrap;
+  }
+
+  /* Comfortable spacing for stacked add/edit forms. */
+  form.grid {
+    gap: 0.85rem;
+  }
+
+  /* Summary / filter stat blocks: keep amounts from overflowing. */
+  [id^="filter-card-"] span,
+  [id^="fixed-filter-card-"] span,
+  [id^="debt-filter-card-"] span {
+    word-break: break-word;
+  }
+
+  /* A thin, visible horizontal scrollbar as an affordance on mobile. */
+  div:has(> table)::-webkit-scrollbar {
+    height: 5px;
+  }
+}
