@@ -61,6 +61,28 @@ export default function DashboardView({
   const totalObligations = paidThisMonth + remainingThisMonth;
   const paidPercent = totalObligations > 0 ? (paidThisMonth / totalObligations) * 100 : 0;
 
+  // Amount to pay per billing day (10 / 15 / 19 / unknown), combining fixed + variable
+  const BILLING_DAYS_DASH = [10, 15, 19];
+  const bucketKeyDash = (dayNum: number) =>
+    (dayNum == null || isNaN(dayNum))
+      ? 'unknown'
+      : String(BILLING_DAYS_DASH.reduce((p, c) => (Math.abs(c - dayNum) < Math.abs(p - dayNum) ? c : p)));
+  const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  fixedExpenses.forEach(fe => {
+    const d = fe.payment_date ? parseInt(fe.payment_date, 10) : NaN;
+    dayBuckets[bucketKeyDash(d)] += Number(fe.amount) || 0;
+  });
+  variableExpenses.forEach(ve => {
+    const d = ve.date ? parseInt(ve.date.split('-')[2], 10) : NaN;
+    dayBuckets[bucketKeyDash(d)] += Number(ve.amount) || 0;
+  });
+  const billingDayCards = [
+    { key: '10', label: '10 לחודש', amount: dayBuckets['10'] },
+    { key: '15', label: '15 לחודש', amount: dayBuckets['15'] },
+    { key: '19', label: '19 לחודש', amount: dayBuckets['19'] },
+    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'] }
+  ];
+
   // Percentage breakdown of expenses
   const totalAllocated = totalFixed + totalVariable + totalDebts;
   const fixedPercent = totalAllocated > 0 ? (totalFixed / totalAllocated) * 100 : 0;
@@ -174,6 +196,35 @@ export default function DashboardView({
               {paidPercent.toFixed(0)}% מההתחייבויות החודש שולמו
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Payment schedule by billing day (fixed + variable combined) */}
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
+        <h4 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-[#22c55e]" />
+          כמה צריך לשלם בכל תאריך בחודש
+        </h4>
+        <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות לפי יום החיוב</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {billingDayCards.map((card) => (
+            <div
+              key={card.key}
+              className={`p-4 rounded-2xl border ${
+                card.key === 'unknown'
+                  ? 'bg-zinc-800/30 border-zinc-700'
+                  : 'bg-sky-950/30 border-sky-500/30'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <CalendarDays className={`w-3.5 h-3.5 ${card.key === 'unknown' ? 'text-zinc-400' : 'text-sky-300'}`} />
+                <span className="text-xs text-gray-400 font-medium">{card.label}</span>
+              </div>
+              <span className={`text-xl font-black font-mono ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
+                {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

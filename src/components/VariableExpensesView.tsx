@@ -157,6 +157,20 @@ export default function VariableExpensesView({
   const remainingTotal = partialTotal + unpaidTotal; // Still owed
   const totalVariable = paidTotal + partialTotal + unpaidTotal;
 
+  // Amount to pay per billing day (variable expenses only)
+  const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  expenses.forEach((e) => {
+    const d = nearestBillingDay(getDayFromDate(e.date));
+    const key = d === 'unknown' ? 'unknown' : String(d);
+    dayBuckets[key] += Number(e.amount) || 0;
+  });
+  const billingDayCards = [
+    { key: '10', label: '10 לחודש', amount: dayBuckets['10'] },
+    { key: '15', label: '15 לחודש', amount: dayBuckets['15'] },
+    { key: '19', label: '19 לחודש', amount: dayBuckets['19'] },
+    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'] }
+  ];
+
   // Apply the active filter to the table rows
   const visibleExpenses =
     statusFilter === 'all'
@@ -273,6 +287,29 @@ export default function VariableExpensesView({
           </button>
         </div>
       )}
+
+      {/* Payment schedule by billing day (variable only) */}
+      <div className="bg-[#121212] border border-zinc-800 rounded-2xl p-5">
+        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-sky-300" />
+          כמה לשלם בכל תאריך — הוצאות משתנות
+        </h4>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {billingDayCards.map((card) => (
+            <div
+              key={card.key}
+              className={`p-3.5 rounded-xl border ${
+                card.key === 'unknown' ? 'bg-zinc-800/30 border-zinc-700' : 'bg-sky-950/30 border-sky-500/30'
+              }`}
+            >
+              <span className="text-xs text-zinc-400 font-medium block mb-1">{card.label}</span>
+              <span className={`text-lg font-black font-mono ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
+                {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Main Table */}
       <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
