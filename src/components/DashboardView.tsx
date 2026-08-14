@@ -88,6 +88,24 @@ export default function DashboardView({
     { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
 
+  // Donut chart: where the money went this month (income + 3 expense types)
+  const pieRaw = [
+    { label: 'הכנסות', value: totalIncome, color: '#22c55e' },
+    { label: 'הוצאות קבועות', value: totalFixed, color: '#f59e0b' },
+    { label: 'הוצאות משתנות', value: totalVariable, color: '#a855f7' },
+    { label: 'חובות והלוואות', value: totalDebts, color: '#ef4444' }
+  ];
+  const pieTotal = pieRaw.reduce((a, c) => a + c.value, 0);
+  const PIE_R = 70;
+  const PIE_C = 2 * Math.PI * PIE_R;
+  let pieAcc = 0;
+  const pieSegments = pieRaw.map((d) => {
+    const frac = pieTotal > 0 ? d.value / pieTotal : 0;
+    const seg = { ...d, frac, dash: frac * PIE_C, offset: pieAcc };
+    pieAcc += frac * PIE_C;
+    return seg;
+  });
+
   // Percentage breakdown of expenses
   const totalAllocated = totalFixed + totalVariable + totalDebts;
   const fixedPercent = totalAllocated > 0 ? (totalFixed / totalAllocated) * 100 : 0;
@@ -202,6 +220,72 @@ export default function DashboardView({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Budget breakdown donut — where the money went this month */}
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
+        <h4 className="text-base font-bold text-white mb-1 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-[#22c55e]" />
+          לאן הלך הכסף החודש
+        </h4>
+        <p className="text-xs text-gray-400 mb-5">פילוח הכנסות והוצאות לפי קטגוריה — לפי אחוזים וסכומים</p>
+
+        {pieTotal === 0 ? (
+          <div className="py-10 text-center text-gray-600 text-sm">אין עדיין נתונים להצגה לחודש זה.</div>
+        ) : (
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {/* Donut */}
+            <svg viewBox="0 0 180 180" className="w-52 h-52 shrink-0">
+              <circle cx="90" cy="90" r={PIE_R} fill="none" stroke="#1f1f22" strokeWidth="22" />
+              <g transform="rotate(-90 90 90)">
+                {pieSegments.map((seg) =>
+                  seg.value > 0 ? (
+                    <circle
+                      key={seg.label}
+                      cx="90"
+                      cy="90"
+                      r={PIE_R}
+                      fill="none"
+                      stroke={seg.color}
+                      strokeWidth="22"
+                      strokeDasharray={`${seg.dash} ${PIE_C - seg.dash}`}
+                      strokeDashoffset={-seg.offset}
+                    />
+                  ) : null
+                )}
+              </g>
+              <text x="90" y="84" textAnchor="middle" className="fill-gray-400" style={{ fontSize: '9px' }}>
+                סה״כ תנועה
+              </text>
+              <text x="90" y="102" textAnchor="middle" className="fill-white" style={{ fontSize: '15px', fontWeight: 800 }}>
+                ₪{pieTotal.toLocaleString('he-IL', { maximumFractionDigits: 0 })}
+              </text>
+            </svg>
+
+            {/* Legend */}
+            <div className="flex-1 w-full space-y-2.5">
+              {pieSegments.map((seg) => (
+                <div
+                  key={seg.label}
+                  className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }}></span>
+                    <span className="text-sm text-gray-200 font-medium truncate">{seg.label}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono font-bold text-sm" style={{ color: seg.color }}>
+                      ₪{seg.value.toLocaleString('he-IL', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-xs font-bold text-gray-400 w-11 text-left">
+                      {(seg.frac * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment schedule by billing day (fixed + variable combined) */}
