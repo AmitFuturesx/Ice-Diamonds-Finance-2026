@@ -37,6 +37,22 @@ export default function DebtsView({
 
   const statusOf = (d: Debt): PaymentStatus => d.status || 'לא שולם';
 
+  // How many payments remain AFTER the current month until the debt is cleared.
+  // Current balance ÷ monthly payment, minus this month's payment.
+  const remainingPayments = (d: Debt): number | null => {
+    const pay = Number(d.monthly_payment) || 0;
+    const bal = Number(d.current_balance) || 0;
+    if (pay <= 0) return null;
+    return Math.max(0, Math.ceil(bal / pay) - 1);
+  };
+
+  const remainingPaymentsLabel = (n: number | null): string => {
+    if (n === null) return '';
+    if (n === 0) return 'התשלום האחרון החודש 🎉';
+    if (n === 1) return 'נותר תשלום 1';
+    return `נותרו ${n} תשלומים`;
+  };
+
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newMonthlyPayment || !newCurrentBalance) return;
@@ -412,6 +428,19 @@ export default function DebtsView({
                             <span>{repaidPercent.toFixed(0)}% סולק</span>
                             <span>נותר: {(item.current_balance || 0).toLocaleString()}</span>
                           </div>
+                          {remainingPayments(item) !== null && (
+                            <div className="pt-1">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                                  remainingPayments(item) === 0
+                                    ? 'bg-green-950/40 text-green-400 border border-green-500/30'
+                                    : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                                }`}
+                              >
+                                {remainingPaymentsLabel(remainingPayments(item))}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
 
