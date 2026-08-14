@@ -68,19 +68,24 @@ export default function DashboardView({
       ? 'unknown'
       : String(BILLING_DAYS_DASH.reduce((p, c) => (Math.abs(c - dayNum) < Math.abs(p - dayNum) ? c : p)));
   const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  const dayRemaining: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
   fixedExpenses.forEach(fe => {
-    const d = fe.payment_date ? parseInt(fe.payment_date, 10) : NaN;
-    dayBuckets[bucketKeyDash(d)] += Number(fe.amount) || 0;
+    const key = bucketKeyDash(fe.payment_date ? parseInt(fe.payment_date, 10) : NaN);
+    const amt = Number(fe.amount) || 0;
+    dayBuckets[key] += amt;
+    if (fe.status !== 'שולם') dayRemaining[key] += amt;
   });
   variableExpenses.forEach(ve => {
-    const d = ve.date ? parseInt(ve.date.split('-')[2], 10) : NaN;
-    dayBuckets[bucketKeyDash(d)] += Number(ve.amount) || 0;
+    const key = bucketKeyDash(ve.date ? parseInt(ve.date.split('-')[2], 10) : NaN);
+    const amt = Number(ve.amount) || 0;
+    dayBuckets[key] += amt;
+    if (ve.status !== 'שולם') dayRemaining[key] += amt;
   });
   const billingDayCards = [
-    { key: '10', label: '10 לחודש', amount: dayBuckets['10'] },
-    { key: '15', label: '15 לחודש', amount: dayBuckets['15'] },
-    { key: '19', label: '19 לחודש', amount: dayBuckets['19'] },
-    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'] }
+    { key: '10', label: '10 לחודש', amount: dayBuckets['10'], remaining: dayRemaining['10'] },
+    { key: '15', label: '15 לחודש', amount: dayBuckets['15'], remaining: dayRemaining['15'] },
+    { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
+    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
 
   // Percentage breakdown of expenses
@@ -220,9 +225,15 @@ export default function DashboardView({
                 <CalendarDays className={`w-3.5 h-3.5 ${card.key === 'unknown' ? 'text-zinc-400' : 'text-sky-300'}`} />
                 <span className="text-xs text-gray-400 font-medium">{card.label}</span>
               </div>
-              <span className={`text-xl font-black font-mono ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
+              <span className={`text-xl font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
                 {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
               </span>
+              <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                <span className="text-[11px] text-gray-500">נותר לשלם</span>
+                <span className={`text-sm font-bold font-mono ${card.remaining > 0 ? 'text-rose-400' : 'text-[#22c55e]'}`}>
+                  {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
             </div>
           ))}
         </div>

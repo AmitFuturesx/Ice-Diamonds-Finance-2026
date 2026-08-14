@@ -134,18 +134,21 @@ export default function FixedExpensesView({
   const remainingTotal = partialTotal + unpaidTotal;
   const totalFixed = paidTotal + partialTotal + unpaidTotal;
 
-  // Amount to pay per billing day (fixed expenses only)
+  // Amount to pay per billing day (fixed expenses only) + remaining (unpaid)
   const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  const dayRemaining: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
   expenses.forEach((e) => {
     const d = nearestBillingDay(getDay(e.payment_date));
     const key = d === 'unknown' ? 'unknown' : String(d);
-    dayBuckets[key] += Number(e.amount) || 0;
+    const amt = Number(e.amount) || 0;
+    dayBuckets[key] += amt;
+    if (e.status !== 'שולם') dayRemaining[key] += amt;
   });
   const billingDayCards = [
-    { key: '10', label: '10 לחודש', amount: dayBuckets['10'] },
-    { key: '15', label: '15 לחודש', amount: dayBuckets['15'] },
-    { key: '19', label: '19 לחודש', amount: dayBuckets['19'] },
-    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'] }
+    { key: '10', label: '10 לחודש', amount: dayBuckets['10'], remaining: dayRemaining['10'] },
+    { key: '15', label: '15 לחודש', amount: dayBuckets['15'], remaining: dayRemaining['15'] },
+    { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
+    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
 
   const visibleExpenses =
@@ -273,9 +276,15 @@ export default function FixedExpensesView({
               }`}
             >
               <span className="text-xs text-zinc-400 font-medium block mb-1">{card.label}</span>
-              <span className={`text-lg font-black font-mono ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
+              <span className={`text-lg font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
                 {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
               </span>
+              <div className="mt-1.5 pt-1.5 border-t border-zinc-800 flex items-center justify-between">
+                <span className="text-[10px] text-zinc-500">נותר</span>
+                <span className={`text-xs font-bold font-mono ${card.remaining > 0 ? 'text-rose-400' : 'text-[#22c55e]'}`}>
+                  {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
             </div>
           ))}
         </div>
