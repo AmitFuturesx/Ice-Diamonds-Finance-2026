@@ -45,6 +45,16 @@ export default function VariableExpensesView({
 
   // Which status the table is filtered to (via the clickable summary blocks)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Which billing-day popup is open (null = closed)
+  const [openDay, setOpenDay] = useState<string | null>(null);
+
+  // Vendor patience mood config
+  const MOODS: Record<string, { emoji: string; label: string; cls: string }> = {
+    happy: { emoji: '😊', label: 'רגוע', cls: 'bg-green-950/40 text-green-400 border-green-500/30' },
+    neutral: { emoji: '😐', label: 'העיר על זה', cls: 'bg-amber-950/40 text-amber-400 border-amber-500/30' },
+    angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-red-950/40 text-red-400 border-red-500/30' }
+  };
+  const nextMood = (m: string) => (m === 'happy' ? 'neutral' : m === 'neutral' ? 'angry' : 'happy');
 
   const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -174,6 +184,18 @@ export default function VariableExpensesView({
     { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
 
+  // Unpaid items for the open billing-day popup
+  const dayKeyOf = (e: VariableExpense) => {
+    const d = nearestBillingDay(getDayFromDate(e.date));
+    return d === 'unknown' ? 'unknown' : String(d);
+  };
+  const openDayItems = openDay
+    ? expenses.filter((e) => dayKeyOf(e) === openDay && e.status !== 'שולם')
+    : [];
+  const openDayLabel = billingDayCards.find((c) => c.key === openDay)?.label || '';
+  const openDayRemaining = openDayItems.reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const cycleMood = (e: VariableExpense) => onSaveExpense({ ...e, mood: nextMood(e.mood || 'happy') });
+
   // Apply the active filter to the table rows
   const visibleExpenses =
     statusFilter === 'all'
@@ -299,13 +321,17 @@ export default function VariableExpensesView({
         </h4>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {billingDayCards.map((card) => (
-            <div
+            <button
               key={card.key}
-              className={`p-3.5 rounded-xl border ${
-                card.key === 'unknown' ? 'bg-zinc-800/30 border-zinc-700' : 'bg-sky-950/30 border-sky-500/30'
+              onClick={() => setOpenDay(card.key)}
+              className={`text-right p-3.5 rounded-xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
+                card.key === 'unknown' ? 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-500' : 'bg-sky-950/30 border-sky-500/30 hover:border-sky-400'
               }`}
             >
-              <span className="text-xs text-zinc-400 font-medium block mb-1">{card.label}</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
+                <span className="text-[9px] text-zinc-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
+              </div>
               <span className={`text-lg font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
                 {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
               </span>
@@ -315,10 +341,69 @@ export default function VariableExpensesView({
                   {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Billing-day popup: who still needs to be paid (variable) + patience level */}
+      {openDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenDay(null)}></div>
+          <div className="relative bg-[#121212] border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-sky-300" />
+                  למי נותר לשלם — {openDayLabel}
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  הוצאות משתנות · סה״כ נותר: <span className="text-rose-400 font-bold font-mono">
+                    {openDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                  </span>
+                </p>
+              </div>
+              <button onClick={() => setOpenDay(null)} className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full transition-colors" title="סגור">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2.5">
+              {openDayItems.length === 0 ? (
+                <div className="py-10 text-center text-[#22c55e] text-sm font-semibold">🎉 הכול שולם לתאריך הזה!</div>
+              ) : (
+                openDayItems.map((e) => {
+                  const mood = MOODS[e.mood || 'happy'] || MOODS.happy;
+                  return (
+                    <div key={e.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white truncate">{e.name}</div>
+                        <div className="text-xs text-zinc-500">{e.status === 'שולם חלקית' ? 'שולם חלקית' : 'לא שולם'}</div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="font-mono font-bold text-rose-400 text-sm">
+                          {(Number(e.amount) || 0).toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                        </span>
+                        <button
+                          onClick={() => cycleMood(e)}
+                          title="לחץ לשינוי רמת הכעס"
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all hover:scale-105 ${mood.cls}`}
+                        >
+                          <span className="text-base leading-none">{mood.emoji}</span>
+                          <span className="hidden sm:inline">{mood.label}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-zinc-800 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-400">
+              <span>😊 רגוע</span><span>😐 העיר על זה</span><span>😠 דורש את הכסף</span>
+              <span className="text-zinc-600">· לחץ על הפרצוף לעדכון</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Table */}
       <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
