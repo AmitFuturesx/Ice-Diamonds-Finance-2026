@@ -15,6 +15,7 @@ export interface FixedExpense {
   notes: string;
   status: PaymentStatus;
   payment_date?: string; // Billing day of month ("10"/"15"/"19") or "" for unknown
+  mood?: string; // Vendor patience: 'happy' | 'neutral' | 'angry'
 }
 
 export interface VariableExpense {
@@ -25,6 +26,7 @@ export interface VariableExpense {
   notes: string;
   date: string;
   status: PaymentStatus;
+  mood?: string; // Vendor patience: 'happy' | 'neutral' | 'angry'
 }
 
 export interface Debt {

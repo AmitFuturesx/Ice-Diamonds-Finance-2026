@@ -1,22 +1,24 @@
-import { 
-  FixedExpense, 
-  VariableExpense, 
-  Debt, 
-  IncomeEntry, 
-  Delivery 
+import { useState } from 'react';
+import {
+  FixedExpense,
+  VariableExpense,
+  Debt,
+  IncomeEntry,
+  Delivery
 } from '../types';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  CreditCard, 
-  CalendarDays, 
-  Calculator, 
-  Truck, 
+import {
+  TrendingUp,
+  TrendingDown,
+  CreditCard,
+  CalendarDays,
+  Calculator,
+  Truck,
   Activity,
   User,
   ArrowUpLeft,
   ArrowDownLeft,
-  Coins
+  Coins,
+  X
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -26,6 +28,8 @@ interface DashboardViewProps {
   incomeEntries: IncomeEntry[];
   deliveries: Delivery[];
   selectedMonthName: string;
+  onSaveFixedExpense?: (e: Omit<FixedExpense, 'id'> & { id?: string }) => Promise<void>;
+  onSaveVariableExpense?: (e: Omit<VariableExpense, 'id'> & { id?: string }) => Promise<void>;
 }
 
 export default function DashboardView({
@@ -34,9 +38,13 @@ export default function DashboardView({
   debts,
   incomeEntries,
   deliveries,
-  selectedMonthName
+  selectedMonthName,
+  onSaveFixedExpense,
+  onSaveVariableExpense
 }: DashboardViewProps) {
-  
+  // Which billing-day popup is open (null = closed)
+  const [openDay, setOpenDay] = useState<string | null>(null);
+
   // Calculations
   const totalIncome = incomeEntries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   
@@ -87,6 +95,60 @@ export default function DashboardView({
     { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
     { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
+
+  // Per-vendor obligations tagged with their billing day + source (for the popup)
+  type Obligation = {
+    id: string;
+    name: string;
+    amount: number;
+    status: string;
+    dayKey: string;
+    source: 'fixed' | 'variable';
+    mood: string;
+    item: FixedExpense | VariableExpense;
+  };
+  const obligations: Obligation[] = [
+    ...fixedExpenses.map((e): Obligation => ({
+      id: e.id,
+      name: e.name,
+      amount: Number(e.amount) || 0,
+      status: e.status,
+      dayKey: bucketKeyDash(e.payment_date ? parseInt(e.payment_date, 10) : NaN),
+      source: 'fixed',
+      mood: e.mood || 'happy',
+      item: e
+    })),
+    ...variableExpenses.map((e): Obligation => ({
+      id: e.id,
+      name: e.name,
+      amount: Number(e.amount) || 0,
+      status: e.status,
+      dayKey: bucketKeyDash(e.date ? parseInt(e.date.split('-')[2], 10) : NaN),
+      source: 'variable',
+      mood: e.mood || 'happy',
+      item: e
+    }))
+  ];
+
+  // Mood config (patience level of the vendor waiting to be paid)
+  const MOODS: Record<string, { emoji: string; label: string; cls: string }> = {
+    happy: { emoji: '😊', label: 'רגוע', cls: 'bg-green-950/40 text-green-400 border-green-500/30' },
+    neutral: { emoji: '😐', label: 'העיר על זה', cls: 'bg-amber-950/40 text-amber-400 border-amber-500/30' },
+    angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-red-950/40 text-red-400 border-red-500/30' }
+  };
+  const nextMood = (m: string) => (m === 'happy' ? 'neutral' : m === 'neutral' ? 'angry' : 'happy');
+  const cycleMood = (o: Obligation) => {
+    const nm = nextMood(o.mood);
+    if (o.source === 'fixed' && onSaveFixedExpense) onSaveFixedExpense({ ...(o.item as FixedExpense), mood: nm });
+    if (o.source === 'variable' && onSaveVariableExpense) onSaveVariableExpense({ ...(o.item as VariableExpense), mood: nm });
+  };
+
+  // Items still owed for the open day (unpaid or partial)
+  const openDayItems = openDay
+    ? obligations.filter((o) => o.dayKey === openDay && o.status !== 'שולם')
+    : [];
+  const openDayLabel = billingDayCards.find((c) => c.key === openDay)?.label || '';
+  const openDayRemaining = openDayItems.reduce((a, o) => a + o.amount, 0);
 
   // Donut chart: where the money went this month (income + 3 expense types)
   const pieRaw = [
@@ -231,17 +293,21 @@ export default function DashboardView({
         <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות לפי יום החיוב</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {billingDayCards.map((card) => (
-            <div
+            <button
               key={card.key}
-              className={`p-4 rounded-2xl border ${
+              onClick={() => setOpenDay(card.key)}
+              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
                 card.key === 'unknown'
-                  ? 'bg-zinc-800/30 border-zinc-700'
-                  : 'bg-sky-950/30 border-sky-500/30'
+                  ? 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-500'
+                  : 'bg-sky-950/30 border-sky-500/30 hover:border-sky-400'
               }`}
             >
-              <div className="flex items-center gap-1.5 mb-1">
-                <CalendarDays className={`w-3.5 h-3.5 ${card.key === 'unknown' ? 'text-zinc-400' : 'text-sky-300'}`} />
-                <span className="text-xs text-gray-400 font-medium">{card.label}</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className={`w-3.5 h-3.5 ${card.key === 'unknown' ? 'text-zinc-400' : 'text-sky-300'}`} />
+                  <span className="text-xs text-gray-400 font-medium">{card.label}</span>
+                </div>
+                <span className="text-[10px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ לפירוט</span>
               </div>
               <span className={`text-xl font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
                 {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
@@ -252,7 +318,7 @@ export default function DashboardView({
                   {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -482,6 +548,84 @@ export default function DashboardView({
           </div>
         </div>
       </div>
+
+      {/* Billing-day popup: who still needs to be paid + their patience level */}
+      {openDay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenDay(null)}></div>
+          <div className="relative bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-sky-300" />
+                  למי נותר לשלם — {openDayLabel}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  סה״כ נותר: <span className="text-rose-400 font-bold font-mono">
+                    {openDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenDay(null)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
+                title="סגור"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto p-4 space-y-2.5">
+              {openDayItems.length === 0 ? (
+                <div className="py-10 text-center text-[#22c55e] text-sm font-semibold">
+                  🎉 הכול שולם לתאריך הזה — אין למי לשלם!
+                </div>
+              ) : (
+                openDayItems.map((o) => {
+                  const mood = MOODS[o.mood] || MOODS.happy;
+                  return (
+                    <div
+                      key={o.source + o.id}
+                      className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white truncate">{o.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {o.source === 'fixed' ? 'הוצאה קבועה' : 'הוצאה משתנה'}
+                          {o.status === 'שולם חלקית' ? ' · שולם חלקית' : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="font-mono font-bold text-rose-400 text-sm">
+                          {o.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                        </span>
+                        <button
+                          onClick={() => cycleMood(o)}
+                          title="לחץ לשינוי רמת הכעס"
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all hover:scale-105 ${mood.cls}`}
+                        >
+                          <span className="text-base leading-none">{mood.emoji}</span>
+                          <span className="hidden sm:inline">{mood.label}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer legend */}
+            <div className="px-5 py-3 border-t border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-400">
+              <span>😊 רגוע</span>
+              <span>😐 העיר על זה</span>
+              <span>😠 דורש את הכסף</span>
+              <span className="text-gray-600">· לחץ על הפרצוף כדי לעדכן</span>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

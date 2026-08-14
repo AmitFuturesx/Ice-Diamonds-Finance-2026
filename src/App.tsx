@@ -595,13 +595,15 @@ export default function App() {
           ) : (
             <>
               {activePage === 'dashboard' && (
-                <DashboardView 
+                <DashboardView
                   fixedExpenses={fixedExpenses}
                   variableExpenses={variableExpenses}
                   debts={debts}
                   incomeEntries={incomeEntries}
                   deliveries={deliveries}
                   selectedMonthName={activeMonthName}
+                  onSaveFixedExpense={handleSaveFixedExpense}
+                  onSaveVariableExpense={handleSaveVariableExpense}
                 />
               )}
 
