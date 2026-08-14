@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Month, 
   FixedExpense, 
@@ -57,6 +57,9 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [activePage, setActivePage] = useState<ActivePage>('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // One-time overdue-payment toast (vendors marked 😐/😠 and still unpaid)
+  const [payNotif, setPayNotif] = useState<{ name: string; amount: number; mood: string }[] | null>(null);
+  const payNotifShown = useRef(false);
 
   // Month select parameters
   const [months, setMonths] = useState<Month[]>([]);
@@ -140,6 +143,19 @@ export default function App() {
     };
     loadAllMonthData();
   }, [currentUser, activeMonthId]);
+
+  // Show the overdue-payment toast once per app load, when data first reveals
+  // vendors marked "commented" (😐) or "demanding" (😠) that are still unpaid.
+  useEffect(() => {
+    if (payNotifShown.current) return;
+    const items = [...fixedExpenses, ...variableExpenses]
+      .filter((e) => e.status !== 'שולם' && (e.mood === 'angry' || e.mood === 'neutral'))
+      .map((e) => ({ name: e.name, amount: Number(e.amount) || 0, mood: e.mood || '' }));
+    if (items.length > 0) {
+      setPayNotif(items);
+      payNotifShown.current = true;
+    }
+  }, [fixedExpenses, variableExpenses]);
 
   // Logout trigger
   const handleLogout = async () => {
@@ -842,6 +858,41 @@ export default function App() {
           <span>מערכת פיננסית פעילה ומלוטשת</span>
         </div>
       </footer>
+
+      {/* Overdue-payment toast (bottom-right, once per load) */}
+      {payNotif && payNotif.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[#141414] border border-rose-500/40 rounded-2xl shadow-2xl overflow-hidden animate-[slideIn_0.25s_ease-out]">
+          <div className="flex items-start justify-between gap-3 px-4 py-3 bg-rose-950/30 border-b border-rose-500/20">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⏰</span>
+              <div>
+                <div className="text-sm font-bold text-rose-300">עבר זמן התשלום!</div>
+                <div className="text-[11px] text-gray-400">{payNotif.length} ספקים ממתינים לתשלום</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setPayNotif(null)}
+              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+              title="סגור"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="max-h-56 overflow-y-auto p-3 space-y-1.5">
+            {payNotif.map((v, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 bg-white/5 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base leading-none shrink-0">{v.mood === 'angry' ? '😠' : '😐'}</span>
+                  <span className="text-sm text-gray-200 truncate">{v.name}</span>
+                </div>
+                <span className="text-xs font-mono font-bold text-rose-400 shrink-0">
+                  {v.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );
