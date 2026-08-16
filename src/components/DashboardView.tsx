@@ -44,6 +44,8 @@ export default function DashboardView({
 }: DashboardViewProps) {
   // Which billing-day popup is open (null = closed)
   const [openDay, setOpenDay] = useState<string | null>(null);
+  // Which whole-month summary popup is open (all / remaining / paid)
+  const [openSummary, setOpenSummary] = useState<'all' | 'remaining' | 'paid' | null>(null);
 
   // Calculations
   const totalIncome = incomeEntries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
@@ -154,6 +156,24 @@ export default function DashboardView({
     : [];
   const openDayLabel = billingDayCards.find((c) => c.key === openDay)?.label || '';
   const openDayRemaining = openDayItems.reduce((a, o) => a + o.amount, 0);
+
+  // Day label for an obligation (for the summary popup context)
+  const dayLabelOf = (k: string) => (k === 'unknown' ? 'לא ידוע' : `${k} לחודש`);
+  const statusBadgeCls = (s: string) =>
+    s === 'שולם'
+      ? 'bg-green-950/40 text-green-400 border-green-500/30'
+      : s === 'שולם חלקית'
+      ? 'bg-amber-950/40 text-amber-400 border-amber-500/30'
+      : 'bg-red-950/40 text-red-400 border-red-500/30';
+
+  // Whole-month summary popup contents
+  const summaryConfig = {
+    all: { title: 'כל התשלומים החודש', filter: (_o: Obligation) => true },
+    remaining: { title: 'נותר לשלם החודש', filter: (o: Obligation) => o.status !== 'שולם' },
+    paid: { title: 'כבר שולם החודש', filter: (o: Obligation) => o.status === 'שולם' }
+  } as const;
+  const summaryItems = openSummary ? obligations.filter(summaryConfig[openSummary].filter) : [];
+  const summaryTotal = summaryItems.reduce((a, o) => a + o.amount, 0);
 
   // Donut chart: where the money went this month (income + 3 expense types)
   const pieRaw = [
@@ -297,26 +317,44 @@ export default function DashboardView({
         </h4>
         <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות לפי יום החיוב</p>
 
-        {/* Whole-month total banner */}
+        {/* Whole-month total banner (each block opens a full breakdown popup) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-            <span className="text-xs text-gray-400 block mb-1">סה״כ לתשלום החודש</span>
+          <button
+            onClick={() => setOpenSummary('all')}
+            className="text-right bg-white/5 border border-white/10 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-white/25 cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">סה״כ לתשלום החודש</span>
+              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
+            </div>
             <span className="text-2xl font-black font-mono text-white">
               {totalDayPay.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
             </span>
-          </div>
-          <div className="bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4">
-            <span className="text-xs text-gray-400 block mb-1">סה״כ נותר לשלם</span>
+          </button>
+          <button
+            onClick={() => setOpenSummary('remaining')}
+            className="text-right bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-rose-400 cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">סה״כ נותר לשלם</span>
+              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
+            </div>
             <span className="text-2xl font-black font-mono text-rose-400">
               {totalDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
             </span>
-          </div>
-          <div className="col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4">
-            <span className="text-xs text-gray-400 block mb-1">כבר שולם</span>
+          </button>
+          <button
+            onClick={() => setOpenSummary('paid')}
+            className="text-right col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-green-400 cursor-pointer"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-400">כבר שולם</span>
+              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
+            </div>
             <span className="text-2xl font-black font-mono text-[#22c55e]">
               {totalDayPaid.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
             </span>
-          </div>
+          </button>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -650,6 +688,56 @@ export default function DashboardView({
               <span>😐 העיר על זה</span>
               <span>😠 דורש את הכסף</span>
               <span className="text-gray-600">· לחץ על הפרצוף כדי לעדכן</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Whole-month summary popup (all / remaining / paid) */}
+      {openSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenSummary(null)}></div>
+          <div className="relative bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h3 className="text-base font-bold text-white">{summaryConfig[openSummary].title}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {summaryItems.length} פריטים · סה״כ <span className="font-bold font-mono text-white">
+                    {summaryTotal.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenSummary(null)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
+                title="סגור"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-4 space-y-2">
+              {summaryItems.length === 0 ? (
+                <div className="py-10 text-center text-gray-600 text-sm">אין פריטים להצגה.</div>
+              ) : (
+                summaryItems.map((o) => (
+                  <div key={o.source + o.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-white truncate">{o.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {o.source === 'fixed' ? 'קבועה' : 'משתנה'} · {dayLabelOf(o.dayKey)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className={`px-2 py-1 rounded-md text-[11px] font-semibold border ${statusBadgeCls(o.status)}`}>
+                        {o.status}
+                      </span>
+                      <span className="font-mono font-bold text-sm text-gray-200 w-20 text-left">
+                        {o.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
