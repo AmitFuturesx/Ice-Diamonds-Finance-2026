@@ -40,7 +40,7 @@ export interface Debt {
   status?: PaymentStatus; // Payment status of this month's installment
 }
 
-export type IncomeSource = 'מקסימוס' | 'UPS' | 'מזומן' | 'העברה בנקאית' | 'קארדקום';
+export type IncomeSource = 'מקסימוס' | 'UPS' | 'מזומן' | 'העברה בנקאית' | 'משולם / GROW';
 
 export interface IncomeEntry {
   id: string;

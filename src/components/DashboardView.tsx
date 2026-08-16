@@ -477,7 +477,7 @@ export default function DashboardView({
 
           {/* Quick list of channels */}
           <div className="space-y-3">
-            {['מקסימוס', 'UPS', 'מזומן', 'העברה בנקאית', 'קארדקום'].map((src) => {
+            {['מקסימוס', 'UPS', 'מזומן', 'העברה בנקאית', 'משולם / GROW'].map((src) => {
               const channelSum = incomeEntries
                 .filter(i => i.source === src)
                 .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
