@@ -104,8 +104,14 @@ export default function App() {
         const list = await dbService.getMonths();
         setMonths(list);
         if (list.length > 0) {
-          // Default to first month (preseed April 2026)
-          setActiveMonthId(list[0].id);
+          // Open on the CURRENT real-world month if it exists; otherwise the most
+          // recent month available (so we never default to an old month like March).
+          const now = new Date();
+          const cy = now.getFullYear();
+          const cm = now.getMonth() + 1;
+          const current = list.find((m) => m.year === cy && m.month_number === cm);
+          const latest = [...list].sort((a, b) => b.year - a.year || b.month_number - a.month_number)[0];
+          setActiveMonthId((current || latest || list[0]).id);
         }
       } catch (err) {
         console.error('Error loading months', err);

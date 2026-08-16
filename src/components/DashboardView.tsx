@@ -96,6 +96,11 @@ export default function DashboardView({
     { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
   ];
 
+  // Whole-month totals for the payment schedule (fixed + variable)
+  const totalDayPay = billingDayCards.reduce((a, c) => a + c.amount, 0);
+  const totalDayRemaining = billingDayCards.reduce((a, c) => a + c.remaining, 0);
+  const totalDayPaid = totalDayPay - totalDayRemaining;
+
   // Per-vendor obligations tagged with their billing day + source (for the popup)
   type Obligation = {
     id: string;
@@ -291,6 +296,29 @@ export default function DashboardView({
           כמה צריך לשלם בכל תאריך בחודש
         </h4>
         <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות לפי יום החיוב</p>
+
+        {/* Whole-month total banner */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+            <span className="text-xs text-gray-400 block mb-1">סה״כ לתשלום החודש</span>
+            <span className="text-2xl font-black font-mono text-white">
+              {totalDayPay.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+            </span>
+          </div>
+          <div className="bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4">
+            <span className="text-xs text-gray-400 block mb-1">סה״כ נותר לשלם</span>
+            <span className="text-2xl font-black font-mono text-rose-400">
+              {totalDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+            </span>
+          </div>
+          <div className="col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4">
+            <span className="text-xs text-gray-400 block mb-1">כבר שולם</span>
+            <span className="text-2xl font-black font-mono text-[#22c55e]">
+              {totalDayPaid.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {billingDayCards.map((card) => (
             <button
