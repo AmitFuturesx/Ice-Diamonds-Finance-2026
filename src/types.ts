@@ -38,6 +38,7 @@ export interface Debt {
   payment_date: string; // e.g. "10" or "2026-04-15"
   original_amount: number;
   status?: PaymentStatus; // Payment status of this month's installment
+  mood?: string; // Lender patience: 'happy' | 'neutral' | 'angry'
 }
 
 export type IncomeSource = 'מקסימוס' | 'UPS' | 'מזומן' | 'העברה בנקאית' | 'משולם / GROW';

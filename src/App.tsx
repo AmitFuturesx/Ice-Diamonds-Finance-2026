@@ -154,14 +154,17 @@ export default function App() {
   // vendors marked "commented" (😐) or "demanding" (😠) that are still unpaid.
   useEffect(() => {
     if (payNotifShown.current) return;
-    const items = [...fixedExpenses, ...variableExpenses]
+    const items = [
+      ...[...fixedExpenses, ...variableExpenses].map((e) => ({ name: e.name, amount: Number(e.amount) || 0, status: e.status, mood: e.mood })),
+      ...debts.map((d) => ({ name: d.name, amount: Number(d.monthly_payment) || 0, status: d.status || 'לא שולם', mood: d.mood }))
+    ]
       .filter((e) => e.status !== 'שולם' && (e.mood === 'angry' || e.mood === 'neutral'))
-      .map((e) => ({ name: e.name, amount: Number(e.amount) || 0, mood: e.mood || '' }));
+      .map((e) => ({ name: e.name, amount: e.amount, mood: e.mood || '' }));
     if (items.length > 0) {
       setPayNotif(items);
       payNotifShown.current = true;
     }
-  }, [fixedExpenses, variableExpenses]);
+  }, [fixedExpenses, variableExpenses, debts]);
 
   // Logout trigger
   const handleLogout = async () => {
@@ -626,6 +629,7 @@ export default function App() {
                   selectedMonthName={activeMonthName}
                   onSaveFixedExpense={handleSaveFixedExpense}
                   onSaveVariableExpense={handleSaveVariableExpense}
+                  onSaveDebt={handleSaveDebt}
                 />
               )}
 

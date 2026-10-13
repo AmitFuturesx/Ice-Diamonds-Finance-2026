@@ -62,25 +62,25 @@ const INITIAL_INCOME: IncomeEntry[] = [
   { id: 'inc_1_2', month_id: 'month_apr_2026', source: 'UPS', amount: 3200, channel: 'שבוע 1', date: '2026-04-04' },
   { id: 'inc_1_3', month_id: 'month_apr_2026', source: 'מזומן', amount: 1500, channel: 'שבוע 1', date: '2026-04-05' },
   { id: 'inc_1_4', month_id: 'month_apr_2026', source: 'העברה בנקאית', amount: 9000, channel: 'שבוע 1', date: '2026-04-05' },
-  { id: 'inc_1_5', month_id: 'month_apr_2026', source: 'קארדקום', amount: 12400, channel: 'שבוע 1', date: '2026-04-05' },
+  { id: 'inc_1_5', month_id: 'month_apr_2026', source: 'משולם / GROW', amount: 12400, channel: 'שבוע 1', date: '2026-04-05' },
   // Week 2
   { id: 'inc_2_1', month_id: 'month_apr_2026', source: 'מקסימוס', amount: 9200, channel: 'שבוע 2', date: '2026-04-10' },
   { id: 'inc_2_2', month_id: 'month_apr_2026', source: 'UPS', amount: 4100, channel: 'שבוע 2', date: '2026-04-11' },
   { id: 'inc_2_3', month_id: 'month_apr_2026', source: 'מזומן', amount: 2000, channel: 'שבוע 2', date: '2026-04-12' },
   { id: 'inc_2_4', month_id: 'month_apr_2026', source: 'העברה בנקאית', amount: 0, channel: 'שבוע 2', date: '2026-04-12' },
-  { id: 'inc_2_5', month_id: 'month_apr_2026', source: 'קארדקום', amount: 14200, channel: 'שבוע 2', date: '2026-04-12' },
+  { id: 'inc_2_5', month_id: 'month_apr_2026', source: 'משולם / GROW', amount: 14200, channel: 'שבוע 2', date: '2026-04-12' },
   // Week 3
   { id: 'inc_3_1', month_id: 'month_apr_2026', source: 'מקסימוס', amount: 7800, channel: 'שבוע 3', date: '2026-04-17' },
   { id: 'inc_3_2', month_id: 'month_apr_2026', source: 'UPS', amount: 3500, channel: 'שבוע 3', date: '2026-04-18' },
   { id: 'inc_3_3', month_id: 'month_apr_2026', source: 'מזומן', amount: 1800, channel: 'שבוע 3', date: '2026-04-19' },
   { id: 'inc_3_4', month_id: 'month_apr_2026', source: 'העברה בנקאית', amount: 15000, channel: 'שבוע 3', date: '2026-04-19' },
-  { id: 'inc_3_5', month_id: 'month_apr_2026', source: 'קארדקום', amount: 11900, channel: 'שבוע 3', date: '2026-04-19' },
+  { id: 'inc_3_5', month_id: 'month_apr_2026', source: 'משולם / GROW', amount: 11900, channel: 'שבוע 3', date: '2026-04-19' },
   // Week 4
   { id: 'inc_4_1', month_id: 'month_apr_2026', source: 'מקסימוס', amount: 11200, channel: 'שבוע 4', date: '2026-04-24' },
   { id: 'inc_4_2', month_id: 'month_apr_2026', source: 'UPS', amount: 4600, channel: 'שבוע 4', date: '2026-04-25' },
   { id: 'inc_4_3', month_id: 'month_apr_2026', source: 'מזומן', amount: 3500, channel: 'שבוע 4', date: '2026-04-26' },
   { id: 'inc_4_4', month_id: 'month_apr_2026', source: 'העברה בנקאית', amount: 8000, channel: 'שבוע 4', date: '2026-04-26' },
-  { id: 'inc_4_5', month_id: 'month_apr_2026', source: 'קארדקום', amount: 18400, channel: 'שבוע 4', date: '2026-04-26' }
+  { id: 'inc_4_5', month_id: 'month_apr_2026', source: 'משולם / GROW', amount: 18400, channel: 'שבוע 4', date: '2026-04-26' }
 ];
 
 const INITIAL_DELIVERIES: Delivery[] = [

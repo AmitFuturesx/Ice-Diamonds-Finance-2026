@@ -4,7 +4,8 @@ import {
   VariableExpense,
   Debt,
   IncomeEntry,
-  Delivery
+  Delivery,
+  PaymentStatus
 } from '../types';
 import {
   TrendingUp,
@@ -30,6 +31,7 @@ interface DashboardViewProps {
   selectedMonthName: string;
   onSaveFixedExpense?: (e: Omit<FixedExpense, 'id'> & { id?: string }) => Promise<void>;
   onSaveVariableExpense?: (e: Omit<VariableExpense, 'id'> & { id?: string }) => Promise<void>;
+  onSaveDebt?: (d: Omit<Debt, 'id'> & { id?: string }) => Promise<void>;
 }
 
 export default function DashboardView({
@@ -40,7 +42,8 @@ export default function DashboardView({
   deliveries,
   selectedMonthName,
   onSaveFixedExpense,
-  onSaveVariableExpense
+  onSaveVariableExpense,
+  onSaveDebt
 }: DashboardViewProps) {
   // Which billing-day popup is open (null = closed)
   const [openDay, setOpenDay] = useState<string | null>(null);
@@ -77,42 +80,16 @@ export default function DashboardView({
     (dayNum == null || isNaN(dayNum))
       ? 'unknown'
       : String(BILLING_DAYS_DASH.reduce((p, c) => (Math.abs(c - dayNum) < Math.abs(p - dayNum) ? c : p)));
-  const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
-  const dayRemaining: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
-  fixedExpenses.forEach(fe => {
-    const key = bucketKeyDash(fe.payment_date ? parseInt(fe.payment_date, 10) : NaN);
-    const amt = Number(fe.amount) || 0;
-    dayBuckets[key] += amt;
-    if (fe.status !== 'שולם') dayRemaining[key] += amt;
-  });
-  variableExpenses.forEach(ve => {
-    const key = bucketKeyDash(ve.date ? parseInt(ve.date.split('-')[2], 10) : NaN);
-    const amt = Number(ve.amount) || 0;
-    dayBuckets[key] += amt;
-    if (ve.status !== 'שולם') dayRemaining[key] += amt;
-  });
-  const billingDayCards = [
-    { key: '10', label: '10 לחודש', amount: dayBuckets['10'], remaining: dayRemaining['10'] },
-    { key: '15', label: '15 לחודש', amount: dayBuckets['15'], remaining: dayRemaining['15'] },
-    { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
-    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
-  ];
-
-  // Whole-month totals for the payment schedule (fixed + variable)
-  const totalDayPay = billingDayCards.reduce((a, c) => a + c.amount, 0);
-  const totalDayRemaining = billingDayCards.reduce((a, c) => a + c.remaining, 0);
-  const totalDayPaid = totalDayPay - totalDayRemaining;
-
-  // Per-vendor obligations tagged with their billing day + source (for the popup)
+  // Per-vendor obligations (fixed + variable + debts) tagged with billing day + source
   type Obligation = {
     id: string;
     name: string;
     amount: number;
     status: string;
     dayKey: string;
-    source: 'fixed' | 'variable';
+    source: 'fixed' | 'variable' | 'debt';
     mood: string;
-    item: FixedExpense | VariableExpense;
+    item: FixedExpense | VariableExpense | Debt;
   };
   const obligations: Obligation[] = [
     ...fixedExpenses.map((e): Obligation => ({
@@ -134,8 +111,36 @@ export default function DashboardView({
       source: 'variable',
       mood: e.mood || 'happy',
       item: e
+    })),
+    ...debts.map((d): Obligation => ({
+      id: d.id,
+      name: d.name,
+      amount: Number(d.monthly_payment) || 0,
+      status: d.status || 'לא שולם',
+      dayKey: bucketKeyDash(d.payment_date ? parseInt(d.payment_date, 10) : NaN),
+      source: 'debt',
+      mood: d.mood || 'happy',
+      item: d
     }))
   ];
+
+  const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  const dayRemaining: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
+  obligations.forEach((o) => {
+    dayBuckets[o.dayKey] += o.amount;
+    if (o.status !== 'שולם') dayRemaining[o.dayKey] += o.amount;
+  });
+  const billingDayCards = [
+    { key: '10', label: '10 לחודש', amount: dayBuckets['10'], remaining: dayRemaining['10'] },
+    { key: '15', label: '15 לחודש', amount: dayBuckets['15'], remaining: dayRemaining['15'] },
+    { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
+    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
+  ];
+
+  // Whole-month totals for the payment schedule (fixed + variable)
+  const totalDayPay = billingDayCards.reduce((a, c) => a + c.amount, 0);
+  const totalDayRemaining = billingDayCards.reduce((a, c) => a + c.remaining, 0);
+  const totalDayPaid = totalDayPay - totalDayRemaining;
 
   // Mood config (patience level of the vendor waiting to be paid)
   const MOODS: Record<string, { emoji: string; label: string; cls: string }> = {
@@ -144,18 +149,32 @@ export default function DashboardView({
     angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-red-950/40 text-red-400 border-red-500/30' }
   };
   const nextMood = (m: string) => (m === 'happy' ? 'neutral' : m === 'neutral' ? 'angry' : 'happy');
-  const cycleMood = (o: Obligation) => {
-    const nm = nextMood(o.mood);
-    if (o.source === 'fixed' && onSaveFixedExpense) onSaveFixedExpense({ ...(o.item as FixedExpense), mood: nm });
-    if (o.source === 'variable' && onSaveVariableExpense) onSaveVariableExpense({ ...(o.item as VariableExpense), mood: nm });
+  // Save a patch (mood / status) back to whichever table the obligation lives in
+  const saveObligation = (o: Obligation, patch: { mood?: string; status?: PaymentStatus }) => {
+    if (o.source === 'fixed' && onSaveFixedExpense) onSaveFixedExpense({ ...(o.item as FixedExpense), ...patch });
+    if (o.source === 'variable' && onSaveVariableExpense) onSaveVariableExpense({ ...(o.item as VariableExpense), ...patch });
+    if (o.source === 'debt' && onSaveDebt) onSaveDebt({ ...(o.item as Debt), ...patch });
   };
+  const cycleMood = (o: Obligation) => saveObligation(o, { mood: nextMood(o.mood) });
 
-  // Items still owed for the open day (unpaid or partial)
+  // Payment status cycle: לא שולם -> שולם חלקית -> שולם -> לא שולם
+  const nextStatus = (s: string): PaymentStatus =>
+    s === 'לא שולם' ? 'שולם חלקית' : s === 'שולם חלקית' ? 'שולם' : 'לא שולם';
+  const cycleStatus = (o: Obligation) => saveObligation(o, { status: nextStatus(o.status) });
+  const sourceLabel = (s: Obligation['source']) =>
+    s === 'fixed' ? 'הוצאה קבועה' : s === 'variable' ? 'הוצאה משתנה' : 'חוב / הלוואה';
+
+  // All items of the open day — unpaid first; paid ones stay visible (dimmed)
+  // so a status click can be undone right there.
   const openDayItems = openDay
-    ? obligations.filter((o) => o.dayKey === openDay && o.status !== 'שולם')
+    ? obligations
+        .filter((o) => o.dayKey === openDay)
+        .sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם'))
     : [];
   const openDayLabel = billingDayCards.find((c) => c.key === openDay)?.label || '';
-  const openDayRemaining = openDayItems.reduce((a, o) => a + o.amount, 0);
+  const openDayRemaining = openDayItems
+    .filter((o) => o.status !== 'שולם')
+    .reduce((a, o) => a + o.amount, 0);
 
   // Day label for an obligation (for the summary popup context)
   const dayLabelOf = (k: string) => (k === 'unknown' ? 'לא ידוע' : `${k} לחודש`);
@@ -315,7 +334,7 @@ export default function DashboardView({
           <CalendarDays className="w-5 h-5 text-[#22c55e]" />
           כמה צריך לשלם בכל תאריך בחודש
         </h4>
-        <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות לפי יום החיוב</p>
+        <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות + חובות לפי יום החיוב</p>
 
         {/* Whole-month total banner (each block opens a full breakdown popup) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
@@ -646,27 +665,34 @@ export default function DashboardView({
             <div className="overflow-y-auto p-4 space-y-2.5">
               {openDayItems.length === 0 ? (
                 <div className="py-10 text-center text-[#22c55e] text-sm font-semibold">
-                  🎉 הכול שולם לתאריך הזה — אין למי לשלם!
+                  אין תשלומים בתאריך הזה.
                 </div>
               ) : (
                 openDayItems.map((o) => {
                   const mood = MOODS[o.mood] || MOODS.happy;
+                  const isPaid = o.status === 'שולם';
                   return (
                     <div
                       key={o.source + o.id}
-                      className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3"
+                      className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-white/5 border border-white/5 rounded-xl px-4 py-3 transition-opacity ${
+                        isPaid ? 'opacity-50' : ''
+                      }`}
                     >
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-white truncate">{o.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {o.source === 'fixed' ? 'הוצאה קבועה' : 'הוצאה משתנה'}
-                          {o.status === 'שולם חלקית' ? ' · שולם חלקית' : ''}
-                        </div>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm font-semibold text-white truncate ${isPaid ? 'line-through' : ''}`}>{o.name}</div>
+                        <div className="text-xs text-gray-500">{sourceLabel(o.source)}</div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="font-mono font-bold text-rose-400 text-sm">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`font-mono font-bold text-sm ${isPaid ? 'text-gray-400' : 'text-rose-400'}`}>
                           {o.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                         </span>
+                        <button
+                          onClick={() => cycleStatus(o)}
+                          title="לחץ לשינוי סטטוס התשלום"
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer whitespace-nowrap transition-all hover:scale-105 ${statusBadgeCls(o.status)}`}
+                        >
+                          {o.status}
+                        </button>
                         <button
                           onClick={() => cycleMood(o)}
                           title="לחץ לשינוי רמת הכעס"
@@ -687,7 +713,7 @@ export default function DashboardView({
               <span>😊 רגוע</span>
               <span>😐 העיר על זה</span>
               <span>😠 דורש את הכסף</span>
-              <span className="text-gray-600">· לחץ על הפרצוף כדי לעדכן</span>
+              <span className="text-gray-600">· לחץ על הסטטוס או הפרצוף כדי לעדכן</span>
             </div>
           </div>
         </div>
@@ -724,7 +750,7 @@ export default function DashboardView({
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-white truncate">{o.name}</div>
                       <div className="text-xs text-gray-500">
-                        {o.source === 'fixed' ? 'קבועה' : 'משתנה'} · {dayLabelOf(o.dayKey)}
+                        {sourceLabel(o.source)} · {dayLabelOf(o.dayKey)}
                       </div>
                     </div>
                     <div className="flex items-center gap-2.5 shrink-0">
