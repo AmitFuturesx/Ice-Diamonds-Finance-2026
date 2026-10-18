@@ -10,6 +10,7 @@ import {
   IncomeSource
 } from './types';
 import { dbService, isLiveSupabase } from './lib/supabase';
+import { exportMonthToExcel } from './lib/exportMonth';
 import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
 import DashboardView from './components/DashboardView';
@@ -35,6 +36,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Download,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -60,6 +62,7 @@ export default function App() {
   // One-time overdue-payment toast (vendors marked 😐/😠 and still unpaid)
   const [payNotif, setPayNotif] = useState<{ name: string; amount: number; mood: string }[] | null>(null);
   const payNotifShown = useRef(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Month select parameters
   const [months, setMonths] = useState<Month[]>([]);
@@ -165,6 +168,30 @@ export default function App() {
       payNotifShown.current = true;
     }
   }, [fixedExpenses, variableExpenses, debts]);
+
+  // Export the active month's full status as a multi-sheet Excel report
+  const handleExportMonth = async () => {
+    const m = months.find((x) => x.id === activeMonthId);
+    if (!m) return;
+    // Some month names already include the year ("מרץ 2026") — don't repeat it
+    const monthLabel = m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`;
+    setIsExporting(true);
+    try {
+      await exportMonthToExcel({
+        monthLabel,
+        fixedExpenses,
+        variableExpenses,
+        debts,
+        incomeEntries,
+        deliveries
+      });
+    } catch (err) {
+      console.error(err);
+      alert('שגיאה ביצירת קובץ האקסל');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // Logout trigger
   const handleLogout = async () => {
@@ -497,6 +524,18 @@ export default function App() {
               title="הוסף חודש חדש"
             >
               <Plus className="w-4 h-4" />
+            </button>
+
+            {/* Export active month to Excel */}
+            <button
+              id="export-month-excel"
+              onClick={handleExportMonth}
+              disabled={isExporting || !activeMonthId}
+              className="flex items-center gap-1.5 p-1.5 md:px-3 bg-[#1a1a1a] hover:bg-white/5 border border-white/5 hover:border-[#22c55e]/30 rounded-full text-[#22c55e] text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+              title="ייצוא החודש לאקסל"
+            >
+              <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
+              <span className="hidden md:inline">{isExporting ? 'מייצא...' : 'ייצוא לאקסל'}</span>
             </button>
           </div>
 
