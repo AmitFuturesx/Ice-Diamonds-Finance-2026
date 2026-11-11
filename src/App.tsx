@@ -725,6 +725,9 @@ export default function App() {
                   onSaveFixedExpense={handleSaveFixedExpense}
                   onSaveVariableExpense={handleSaveVariableExpense}
                   onSaveDebt={handleSaveDebt}
+                  employees={employees}
+                  employeeMonths={employeeMonths}
+                  onOpenEmployees={() => setActivePage('employees')}
                 />
               )}
 

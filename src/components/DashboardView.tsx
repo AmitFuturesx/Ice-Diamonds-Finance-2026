@@ -5,8 +5,12 @@ import {
   Debt,
   IncomeEntry,
   Delivery,
-  PaymentStatus
+  PaymentStatus,
+  Employee,
+  EmployeeMonth,
+  Department
 } from '../types';
+import { computePay } from '../lib/payroll';
 import {
   TrendingUp,
   TrendingDown,
@@ -32,6 +36,9 @@ interface DashboardViewProps {
   onSaveFixedExpense?: (e: Omit<FixedExpense, 'id'> & { id?: string }) => Promise<void>;
   onSaveVariableExpense?: (e: Omit<VariableExpense, 'id'> & { id?: string }) => Promise<void>;
   onSaveDebt?: (d: Omit<Debt, 'id'> & { id?: string }) => Promise<void>;
+  employees?: Employee[];
+  employeeMonths?: EmployeeMonth[];
+  onOpenEmployees?: () => void;
 }
 
 export default function DashboardView({
@@ -43,7 +50,10 @@ export default function DashboardView({
   selectedMonthName,
   onSaveFixedExpense,
   onSaveVariableExpense,
-  onSaveDebt
+  onSaveDebt,
+  employees = [],
+  employeeMonths = [],
+  onOpenEmployees
 }: DashboardViewProps) {
   // Which billing-day popup is open (null = closed)
   const [openDay, setOpenDay] = useState<string | null>(null);
@@ -193,6 +203,26 @@ export default function DashboardView({
   } as const;
   const summaryItems = openSummary ? obligations.filter(summaryConfig[openSummary].filter) : [];
   const summaryTotal = summaryItems.reduce((a, o) => a + o.amount, 0);
+
+  // Payroll summary — same calculation as the employees screen
+  const empMonthById: Record<string, EmployeeMonth | undefined> = {};
+  employeeMonths.forEach((m) => (empMonthById[m.employee_id] = m));
+  const payrollRows = employees
+    .map((e) => ({
+      emp: e,
+      total: computePay(e, empMonthById[e.id], employees, empMonthById).total,
+      status: (empMonthById[e.id]?.status || 'לא שולם') as PaymentStatus
+    }))
+    .sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם') || b.total - a.total);
+  const payrollTotal = payrollRows.reduce((a, r) => a + r.total, 0);
+  const payrollPaid = payrollRows.filter((r) => r.status === 'שולם').reduce((a, r) => a + r.total, 0);
+  const DEPT_LABEL: Record<Department, string> = { freelancer: 'פרילנסרים', sales: 'אנשי מכירות', staff: 'עובדים נוספים' };
+  const payrollByDept = (Object.keys(DEPT_LABEL) as Department[]).map((d) => ({
+    key: d,
+    label: DEPT_LABEL[d],
+    count: payrollRows.filter((r) => r.emp.department === d).length,
+    total: payrollRows.filter((r) => r.emp.department === d).reduce((a, r) => a + r.total, 0)
+  }));
 
   // Donut chart: where the money went this month (income + 3 expense types)
   const pieRaw = [
@@ -406,6 +436,89 @@ export default function DashboardView({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Employees & payroll status */}
+      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h4 className="text-base font-bold text-white flex items-center gap-2">
+              <User className="w-5 h-5 text-[#22c55e]" />
+              עובדים ושכר החודש
+            </h4>
+            <p className="text-xs text-gray-400 mt-1">כמה מגיע לכל אחד החודש, וכמה כבר שולם</p>
+          </div>
+          {onOpenEmployees && (
+            <button
+              onClick={onOpenEmployees}
+              className="shrink-0 text-xs font-semibold text-[#22c55e] bg-[#22c55e]/10 border border-[#22c55e]/20 hover:bg-[#22c55e]/20 px-3 py-1.5 rounded-lg cursor-pointer"
+            >
+              לניהול עובדים ←
+            </button>
+          )}
+        </div>
+
+        {employees.length === 0 ? (
+          <div className="py-8 text-center text-gray-600 text-sm">עוד לא הוגדרו עובדים. הוסף אותם במסך "עובדים ושכר".</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <span className="text-xs text-gray-400 block mb-1">סה״כ שכר החודש</span>
+                <span className="text-2xl font-black font-mono text-white">
+                  {payrollTotal.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4">
+                <span className="text-xs text-gray-400 block mb-1">נותר לשלם לעובדים</span>
+                <span className="text-2xl font-black font-mono text-rose-400">
+                  {(payrollTotal - payrollPaid).toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4">
+                <span className="text-xs text-gray-400 block mb-1">כבר שולם</span>
+                <span className="text-2xl font-black font-mono text-[#22c55e]">
+                  {payrollPaid.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
+
+            {/* By department */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {payrollByDept.map((d) => (
+                <div key={d.key} className="bg-white/5 border border-white/5 rounded-xl px-3 py-2.5">
+                  <div className="text-[11px] text-gray-400 truncate">
+                    {d.label} <span className="text-gray-600">({d.count})</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-gray-200">
+                    {d.total.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Per person: unpaid first */}
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+              {payrollRows.map((r) => (
+                <div
+                  key={r.emp.id}
+                  className={`flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2 ${r.status === 'שולם' ? 'opacity-50' : ''}`}
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm text-gray-200 font-medium truncate">{r.emp.name}</div>
+                    <div className="text-[11px] text-gray-500 truncate">{r.emp.role || DEPT_LABEL[r.emp.department]}</div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono font-bold text-sm text-gray-200">
+                      {r.total.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${statusBadgeCls(r.status)}`}>{r.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Budget breakdown donut — where the money went this month */}
