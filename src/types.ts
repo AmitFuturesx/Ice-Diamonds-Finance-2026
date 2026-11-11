@@ -89,7 +89,7 @@ export interface EmployeeMonth {
   month_id: string;
   hours: number;
   deals_count: number;
-  deals_amount: number;    // total ₪ value of deals closed this month
+  deals_amount: number;    // ₪ value PER DEAL (commission = deals_count × deals_amount × %)
   status: PaymentStatus;
   notes: string;
 }

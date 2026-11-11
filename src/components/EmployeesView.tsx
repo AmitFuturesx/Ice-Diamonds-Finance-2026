@@ -218,7 +218,7 @@ export default function EmployeesView({
                 <th className="p-3 font-semibold">שם</th>
                 {!isFreelancer && <th className="p-3 font-semibold">שעות החודש</th>}
                 {!isFreelancer && <th className="p-3 font-semibold">עסקאות</th>}
-                {!isFreelancer && <th className="p-3 font-semibold">סכום העסקאות (₪)</th>}
+                {!isFreelancer && <th className="p-3 font-semibold">סכום לעסקה (₪)</th>}
                 <th className="p-3 font-semibold">פירוט התשלום</th>
                 <th className="p-3 font-semibold">מע״מ</th>
                 <th className="p-3 font-semibold">לתשלום</th>
@@ -232,7 +232,7 @@ export default function EmployeesView({
                   <td colSpan={9} className="p-8 text-center text-zinc-600">עוד אין אנשים במחלקה הזו — לחץ "הוסף" למעלה.</td>
                 </tr>
               ) : (
-                deptRows.map(({ emp, pay, status }) => {
+                deptRows.map(({ emp, month, pay, status }) => {
                   const manager = employees.find((x) => x.id === emp.manager_id);
                   return (
                     <tr key={emp.id} className="hover:bg-zinc-900/35 align-top">
@@ -261,7 +261,14 @@ export default function EmployeesView({
                       <td className="p-3 text-xs text-zinc-400 space-y-0.5 whitespace-nowrap">
                         {pay.fixedPay > 0 && <div>קבוע: {ils(pay.fixedPay)}</div>}
                         {emp.hourly_rate > 0 && <div>שעתי: {ils(pay.hourlyPay)} <span className="text-zinc-600">({emp.hourly_rate} ₪/ש׳)</span></div>}
-                        {emp.commission_pct > 0 && <div>עמלה {emp.commission_pct}%: {ils(pay.ownCommission)}</div>}
+                        {emp.commission_pct > 0 && (
+                          <div>
+                            עמלה {emp.commission_pct}%: {ils(pay.ownCommission)}{' '}
+                            <span className="text-zinc-600">
+                              ({month?.deals_count || 0} × {(Number(month?.deals_amount) || 0).toLocaleString('he-IL')} ₪)
+                            </span>
+                          </div>
+                        )}
                         {emp.override_pct > 0 && <div className="text-sky-300">מהצוות {emp.override_pct}%: {ils(pay.overridePay)}</div>}
                       </td>
                       <td className="p-3 text-xs whitespace-nowrap">
@@ -297,7 +304,7 @@ export default function EmployeesView({
         </div>
         {!isFreelancer && deptRows.length > 0 && (
           <p className="px-4 py-3 text-[11px] text-zinc-500 border-t border-zinc-800">
-            ממלאים שעות, כמות עסקאות וסכום העסקאות לחודש הנבחר — זה נשמר אוטומטית כשיוצאים מהשדה. העמלה מחושבת מסכום העסקאות.
+            ממלאים שעות, כמות עסקאות וסכום לכל עסקה לחודש הנבחר — זה נשמר אוטומטית כשיוצאים מהשדה. העמלה = כמות עסקאות × סכום לעסקה × אחוז העמלה (אם העסקאות במחירים שונים, הזן ממוצע).
           </p>
         )}
       </div>
@@ -383,7 +390,7 @@ export default function EmployeesView({
                     {numField('override_pct', 'אחוז שהוא מקבל מהנציגים שתחתיו', '%')}
                   </div>
                   <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    דוגמה: אלעד מנהל ומוגדר עם 3%. דנה מוגדרת כ"תחת אלעד" עם עמלה 10%. על כל עסקה של דנה — דנה מקבלת 10% ואלעד מקבל עוד 3%, בנוסף לעמלה על העסקאות שלו עצמו.
+                    דוגמה: אלעד מנהל ומוגדר עם 3%. נציג מוגדר כ"תחת אלעד" עם עמלה 10%. על כל עסקה של הנציג — הנציג מקבל 10% ואלעד מקבל עוד 3%, בנוסף לעמלה על העסקאות שלו עצמו.
                   </p>
                 </div>
               )}
