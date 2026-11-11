@@ -7,7 +7,9 @@ import {
   IncomeEntry, 
   Delivery,
   PaymentStatus,
-  IncomeSource
+  IncomeSource,
+  Employee,
+  EmployeeMonth
 } from './types';
 import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
@@ -19,6 +21,7 @@ import VariableExpensesView from './components/VariableExpensesView';
 import DebtsView from './components/DebtsView';
 import IncomeView from './components/IncomeView';
 import DeliveriesView from './components/DeliveriesView';
+import EmployeesView from './components/EmployeesView';
 
 import { 
   Diamond, 
@@ -43,7 +46,7 @@ import {
   Landmark
 } from 'lucide-react';
 
-type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries';
+type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries' | 'employees';
 
 // Hebrew month names, indexed by month number - 1
 const HEBREW_MONTHS = [
@@ -79,6 +82,8 @@ export default function App() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeMonths, setEmployeeMonths] = useState<EmployeeMonth[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Authentication check on startup
@@ -151,6 +156,20 @@ export default function App() {
       }
     };
     loadAllMonthData();
+  }, [currentUser, activeMonthId]);
+
+  // Payroll loads separately so a payroll problem never blocks the finance data
+  useEffect(() => {
+    if (!currentUser) return;
+    dbService.getEmployees().then(setEmployees).catch((err) => console.error('Error loading employees', err));
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser || !activeMonthId) return;
+    dbService
+      .getEmployeeMonths(activeMonthId)
+      .then(setEmployeeMonths)
+      .catch((err) => console.error('Error loading payroll month', err));
   }, [currentUser, activeMonthId]);
 
   // Show the overdue-payment toast once per app load, when data first reveals
@@ -439,6 +458,42 @@ export default function App() {
     }
   };
 
+  // Content Actions (Employees / payroll) — failures are shown, not swallowed
+  const handleSaveEmployee = async (item: Omit<Employee, 'id'> & { id?: string }) => {
+    try {
+      const saved = await dbService.saveEmployee(item);
+      setEmployees(prev => (prev.some(p => p.id === saved.id) ? prev.map(p => (p.id === saved.id ? saved : p)) : [...prev, saved]));
+    } catch (err) {
+      console.error(err);
+      alert('שמירת העובד נכשלה. ודא שהרצת את פקודת ה-SQL של טבלאות העובדים.');
+    }
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      await dbService.deleteEmployee(id);
+      setEmployees(prev => prev.filter(e => e.id !== id).map(e => (e.manager_id === id ? { ...e, manager_id: null } : e)));
+      setEmployeeMonths(prev => prev.filter(m => m.employee_id !== id));
+    } catch (err) {
+      console.error(err);
+      alert('מחיקת העובד נכשלה.');
+    }
+  };
+
+  const handleSaveEmployeeMonth = async (row: Omit<EmployeeMonth, 'id'> & { id?: string }) => {
+    try {
+      const saved = await dbService.saveEmployeeMonth(row);
+      setEmployeeMonths(prev =>
+        prev.some(m => m.employee_id === saved.employee_id)
+          ? prev.map(m => (m.employee_id === saved.employee_id ? saved : m))
+          : [...prev, saved]
+      );
+    } catch (err) {
+      console.error(err);
+      alert('שמירת נתוני החודש נכשלה.');
+    }
+  };
+
   // Layout Dynamic Calculations (recalculates immediately on any input addition or edit)
   const totalIncomeCalc = incomeEntries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
   const totalExpensesCalc = 
@@ -457,6 +512,7 @@ export default function App() {
     { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard },
     { id: 'debts', label: 'חובות והלוואות', icon: Landmark },
     { id: 'deliveries', label: 'שליחויות', icon: Truck },
+    { id: 'employees', label: 'עובדים ושכר', icon: User },
   ];
 
   // Render check
@@ -716,6 +772,17 @@ export default function App() {
                   activeMonthId={activeMonthId}
                   onSaveDelivery={handleSaveDelivery}
                   onDeleteDelivery={handleDeleteDelivery}
+                />
+              )}
+
+              {activePage === 'employees' && (
+                <EmployeesView
+                  employees={employees}
+                  employeeMonths={employeeMonths}
+                  activeMonthId={activeMonthId}
+                  onSaveEmployee={handleSaveEmployee}
+                  onDeleteEmployee={handleDeleteEmployee}
+                  onSaveEmployeeMonth={handleSaveEmployeeMonth}
                 />
               )}
             </>

@@ -6,8 +6,10 @@ import {
   Debt, 
   IncomeEntry, 
   Delivery, 
-  PaymentStatus, 
-  IncomeSource 
+  PaymentStatus,
+  IncomeSource,
+  Employee,
+  EmployeeMonth
 } from '../types';
 
 // Retrieve environment variables
@@ -534,5 +536,85 @@ export const dbService = {
       deliveries = deliveries.filter(d => d.id !== id);
       saveToStorage('deliveries', deliveries);
     }
+  },
+
+  // Employees (persistent, not per month)
+  async getEmployees(): Promise<Employee[]> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('employees')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data as any) || [];
+    }
+    return getFromStorage<Employee>('employees');
+  },
+
+  async saveEmployee(emp: Omit<Employee, 'id'> & { id?: string }): Promise<Employee> {
+    if (isLiveSupabase && supabaseClient) {
+      const query = emp.id
+        ? supabaseClient.from('employees').update(emp).eq('id', emp.id)
+        : supabaseClient.from('employees').insert([emp]);
+      const { data, error } = await query.select();
+      if (error) throw error;
+      return data[0];
+    }
+    let list = getFromStorage<Employee>('employees');
+    if (emp.id) {
+      list = list.map(e => (e.id === emp.id ? { ...e, ...emp } as Employee : e));
+      saveToStorage('employees', list);
+      return emp as Employee;
+    }
+    const created = { ...emp, id: 'emp_' + Math.random().toString(36).slice(2, 11) } as Employee;
+    saveToStorage('employees', [...list, created]);
+    return created;
+  },
+
+  async deleteEmployee(id: string): Promise<void> {
+    if (isLiveSupabase && supabaseClient) {
+      // Monthly rows are removed by the ON DELETE CASCADE foreign key
+      const { error } = await supabaseClient.from('employees').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
+    saveToStorage('employees', getFromStorage<Employee>('employees').filter(e => e.id !== id));
+    saveToStorage('employee_months', getFromStorage<EmployeeMonth>('employee_months').filter(m => m.employee_id !== id));
+  },
+
+  // Per-month payroll numbers
+  async getEmployeeMonths(monthId: string): Promise<EmployeeMonth[]> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('employee_months')
+        .select('*')
+        .eq('month_id', monthId);
+      if (error) throw error;
+      return (data as any) || [];
+    }
+    return getFromStorage<EmployeeMonth>('employee_months').filter(m => m.month_id === monthId);
+  },
+
+  // Insert or update the row for (employee, month) — there is at most one
+  async saveEmployeeMonth(row: Omit<EmployeeMonth, 'id'> & { id?: string }): Promise<EmployeeMonth> {
+    if (isLiveSupabase && supabaseClient) {
+      const { id: _ignored, ...payload } = row;
+      const { data, error } = await supabaseClient
+        .from('employee_months')
+        .upsert([payload], { onConflict: 'employee_id,month_id' })
+        .select();
+      if (error) throw error;
+      return data[0];
+    }
+    const list = getFromStorage<EmployeeMonth>('employee_months');
+    const existing = list.find(m => m.employee_id === row.employee_id && m.month_id === row.month_id);
+    if (existing) {
+      const updated = { ...existing, ...row, id: existing.id };
+      saveToStorage('employee_months', list.map(m => (m.id === existing.id ? updated : m)));
+      return updated;
+    }
+    const created = { ...row, id: 'em_' + Math.random().toString(36).slice(2, 11) } as EmployeeMonth;
+    saveToStorage('employee_months', [...list, created]);
+    return created;
   }
 };

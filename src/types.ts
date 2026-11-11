@@ -62,6 +62,38 @@ export interface Delivery {
   notes: string;
 }
 
+// ---------- Employees / payroll ----------
+export type Department = 'freelancer' | 'sales' | 'staff';
+// plus_vat = עוסק מורשה (VAT added on top), exempt = עוסק פטור, none = שכיר (no VAT)
+export type VatMode = 'plus_vat' | 'exempt' | 'none';
+
+// A person on the payroll. Persistent across months; monthly numbers live in EmployeeMonth.
+export interface Employee {
+  id: string;
+  name: string;
+  department: Department;
+  role: string;            // e.g. "שיווק", "נציג מכירות", "אחראית חנות"
+  hourly_rate: number;     // ₪ per hour (0 if not hourly)
+  monthly_fee: number;     // fixed monthly payment (freelancers)
+  commission_pct: number;  // % of the value of deals this person closes
+  manager_id: string | null; // sales: the rep's team manager
+  override_pct: number;    // % this person earns on deals closed by reps under them
+  vat_mode: VatMode;
+  active: boolean;
+}
+
+// One employee's numbers for one month
+export interface EmployeeMonth {
+  id: string;
+  employee_id: string;
+  month_id: string;
+  hours: number;
+  deals_count: number;
+  deals_amount: number;    // total ₪ value of deals closed this month
+  status: PaymentStatus;
+  notes: string;
+}
+
 export interface FinancialSummary {
   totalIncome: number;
   totalFixedExpenses: number;
