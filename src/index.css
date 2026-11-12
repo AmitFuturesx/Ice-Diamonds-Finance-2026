@@ -121,6 +121,8 @@ input, select, textarea {
 
 /* ---------- UI kit motion ---------- */
 .num { font-variant-numeric: tabular-nums; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 /* sparkline stroke draws itself */
 @keyframes drawLine { from { stroke-dasharray: 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1; stroke-dashoffset: 0; } }

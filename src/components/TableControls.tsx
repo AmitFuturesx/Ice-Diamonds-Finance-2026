@@ -54,14 +54,14 @@ export function TableSearch({
   total?: number;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
+    <div className="flex items-center gap-2 flex-1 sm:flex-none min-w-0">
+      <div className="relative flex-1 sm:flex-none">
         <Search className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-44 sm:w-56 bg-white border border-line rounded-xl pr-9 pl-8 py-2 text-sm text-ink placeholder-slate-400 outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
+          className="w-full sm:w-56 h-10 bg-white border border-line rounded-xl pr-9 pl-8 text-sm text-ink placeholder-slate-400 outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
         />
         {value && (
           <button
@@ -98,7 +98,7 @@ export function SortTh({
   const active = sort?.key === sortKey;
   const Icon = !active ? ChevronsUpDown : sort!.dir === 'asc' ? ChevronUp : ChevronDown;
   return (
-    <th className={`p-4 font-semibold ${className}`} aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+    <th className={`px-4 py-3 font-semibold ${className}`} aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button
         type="button"
         onClick={() => onSort(sortKey)}

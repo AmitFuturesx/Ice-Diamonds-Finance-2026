@@ -194,19 +194,95 @@ export function Kpi({
   );
 }
 
+/* ---------- compact stat tile that doubles as a filter ---------- */
+export function StatTile({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone = 'navy',
+  active,
+  onClick,
+  i = 0
+}: {
+  icon: IconT;
+  label: string;
+  value: number;
+  sub?: ReactNode;
+  tone?: Tone;
+  active?: boolean;
+  onClick?: () => void;
+  i?: number;
+}) {
+  const v = useCountUp(value, 900, 80 + i * 60);
+  const Tag = onClick ? 'button' : 'div';
+  return (
+    <Tag
+      {...(onClick ? { type: 'button', onClick, 'aria-pressed': !!active } : {})}
+      className={`text-right bg-white rounded-[1.4rem] p-4 sm:p-5 flex flex-col gap-2 min-w-0 transition-all ${
+        active ? 'ring-2 ring-navy shadow-pop' : 'shadow-card'
+      } ${onClick ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+    >
+      <div className="flex items-center gap-2">
+        <span className={`w-8 h-8 rounded-xl grid place-items-center shrink-0 ${TONE_SOFT[tone]}`}>
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className="text-[12.5px] font-semibold text-ink-2 truncate">{label}</span>
+      </div>
+      <b className="text-[19px] sm:text-[23px] font-extrabold text-ink tracking-tight num truncate">{ils(v)}</b>
+      {sub && <div className="text-[11.5px] text-muted truncate">{sub}</div>}
+    </Tag>
+  );
+}
+
+/* ---------- billing-day chip (10 / 15 / 19 / unknown) ---------- */
+export type BillingDay = 10 | 15 | 19 | 'unknown';
+export const BILLING_OPTIONS: BillingDay[] = [10, 15, 19, 'unknown'];
+export const nextBillingDay = (d: BillingDay) => BILLING_OPTIONS[(BILLING_OPTIONS.indexOf(d) + 1) % BILLING_OPTIONS.length];
+/** Snap any stored day-of-month to 10 / 15 / 19; empty → unknown */
+export const snapDay = (n: number): BillingDay =>
+  n == null || isNaN(n) ? 'unknown' : ([10, 15, 19] as const).reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p));
+
+export function DayChip({ day, onClick }: { day: BillingDay; onClick?: () => void }) {
+  const unknown = day === 'unknown';
+  return (
+    <button
+      type="button"
+      disabled={!onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      title={onClick ? 'לחיצה מחליפה את יום החיוב' : undefined}
+      className={`inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
+        unknown ? 'bg-panel text-muted' : 'bg-[#eef0f8] text-navy'
+      } ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-navy/15 active:scale-95' : ''}`}
+    >
+      {unknown ? 'לא ידוע' : (
+        <>
+          <span className="num">{day}</span>
+          <span className="font-medium opacity-70">לחודש</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 /* ---------- segmented control with a sliding pill ---------- */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   size = 'md',
-  label
+  label,
+  full
 }: {
   options: { id: T; label: string; count?: number }[];
   value: T;
   onChange: (id: T) => void;
   size?: 'sm' | 'md';
   label?: string;
+  full?: boolean; // stretch to the row on phones
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
@@ -216,7 +292,12 @@ export function Segmented<T extends string>({
     if (b) setPill({ left: b.offsetLeft, width: b.offsetWidth });
   }, [value, w, options.length]);
   return (
-    <div ref={ref} role="tablist" aria-label={label} className="relative inline-flex items-center bg-panel rounded-xl p-1 max-w-full overflow-x-auto">
+    <div
+      ref={ref}
+      role="tablist"
+      aria-label={label}
+      className={`no-scrollbar relative items-center bg-panel rounded-xl p-1 max-w-full overflow-x-auto ${full ? 'flex w-full sm:inline-flex sm:w-auto' : 'inline-flex'}`}
+    >
       {pill && (
         <span
           aria-hidden="true"
@@ -233,9 +314,9 @@ export function Segmented<T extends string>({
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.id)}
-            className={`relative z-[1] whitespace-nowrap rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-              size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-[13px]'
-            } ${on ? 'text-navy' : 'text-muted hover:text-ink'}`}
+            className={`relative z-[1] whitespace-nowrap rounded-lg font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+              size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-1.5 sm:px-3.5 py-1.5 text-[12.5px] sm:text-[13px]'
+            } ${full ? 'flex-1 sm:flex-none' : ''} ${on ? 'text-navy' : 'text-muted hover:text-ink'}`}
           >
             {o.label}
             {o.count !== undefined && (

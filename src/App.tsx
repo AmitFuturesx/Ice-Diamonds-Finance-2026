@@ -16,8 +16,7 @@ import { exportMonthToExcel } from './lib/exportMonth';
 import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
 import DashboardView from './components/DashboardView';
-import FixedExpensesView from './components/FixedExpensesView';
-import VariableExpensesView from './components/VariableExpensesView';
+import ExpensesPage from './pages/ExpensesPage';
 import DebtsView from './components/DebtsView';
 import IncomeView from './components/IncomeView';
 import DeliveriesView from './components/DeliveriesView';
@@ -47,9 +46,6 @@ import {
   ChevronRight,
   Landmark,
   Search,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
   PanelRightClose,
   CalendarDays
 } from 'lucide-react';
@@ -891,43 +887,6 @@ export default function App() {
               </div>
             </header>
 
-            {/* Month KPIs (the dashboard has its own, richer version) */}
-            {activePage !== 'dashboard' && (
-            <section className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-6">
-              <div className="bg-white shadow-card rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3">
-                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 place-items-center shrink-0">
-                  <TrendingUp className="w-5 h-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[11px] sm:text-xs text-muted font-medium">הכנסות החודש</div>
-                  <div className="text-base sm:text-2xl font-extrabold text-emerald-600 truncate">{ils0(totalIncomeCalc)}</div>
-                </div>
-              </div>
-              <div className="bg-white shadow-card rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3">
-                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 place-items-center shrink-0">
-                  <TrendingDown className="w-5 h-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[11px] sm:text-xs text-muted font-medium">הוצאות החודש</div>
-                  <div className="text-base sm:text-2xl font-extrabold text-rose-600 truncate">{ils0(totalExpensesCalc)}</div>
-                </div>
-              </div>
-              <div
-                className="rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3 text-white"
-                style={{ background: 'linear-gradient(150deg, #24316e, #16204f)' }}
-              >
-                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-white/10 text-gold place-items-center shrink-0">
-                  <Wallet className="w-5 h-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="text-[11px] sm:text-xs text-white/65 font-medium">מאזן נטו · {activeMonthName}</div>
-                  <div className={`text-base sm:text-2xl font-extrabold truncate ${netBalanceCalc >= 0 ? 'text-[#86efac]' : 'text-[#fda4af]'}`}>
-                    {ils0(netBalanceCalc)}
-                  </div>
-                </div>
-              </div>
-            </section>
-            )}
 
         {/* Dynamic Panel Workspace — re-keyed so each page / month change plays the entrance */}
         <main key={`${activePage}-${activeMonthId}`} className="page-enter min-w-0">
@@ -960,22 +919,26 @@ export default function App() {
               )}
 
               {activePage === 'fixed_expenses' && (
-                <FixedExpensesView 
+                <ExpensesPage
+                  kind="fixed"
                   expenses={fixedExpenses}
                   activeMonthId={activeMonthId}
                   onSaveExpense={handleSaveFixedExpense}
                   onDeleteExpense={handleDeleteFixedExpense}
+                  notify={pushToast}
                 />
               )}
 
               {activePage === 'variable_expenses' && (
-                <VariableExpensesView
+                <ExpensesPage
+                  kind="variable"
                   expenses={variableExpenses}
                   activeMonthId={activeMonthId}
                   monthYear={activeMonthObject?.year}
                   monthNumber={activeMonthObject?.month_number}
                   onSaveExpense={handleSaveVariableExpense}
                   onDeleteExpense={handleDeleteVariableExpense}
+                  notify={pushToast}
                 />
               )}
 
