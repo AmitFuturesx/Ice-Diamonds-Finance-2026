@@ -1,5 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "./orbit/styles/index.css";
 
 /* ---------------------------------------------------------------------
    Ice Diamonds design tokens — light SaaS look in the brand colours
@@ -10,16 +11,18 @@
   --font-sans: "Heebo", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Heebo", ui-sans-serif, system-ui, sans-serif;
 
-  --color-ink: #16204f;        /* primary text = brand navy */
-  --color-ink-2: #3b4566;      /* secondary strong text */
-  --color-muted: #8a93a8;      /* labels, hints */
-  --color-line: #e6e9f1;       /* borders, dividers */
-  --color-panel: #f4f6fa;      /* inner panel background */
-  --color-navy: #16204f;       /* brand / primary actions */
-  --color-navy-2: #24316e;     /* hover of primary */
-  --color-gold: #d9b455;       /* brand accent */
-  --color-gold-2: #a9822b;     /* gold text on light */
-  --color-gold-soft: #faf3df;  /* gold tint surface */
+  /* Orbit palette (the names stay, the colours follow the template):
+     navy → Orbit teal (primary actions), gold → Orbit green (accent) */
+  --color-ink: #232f38;
+  --color-ink-2: #33404a;
+  --color-muted: #9aa6ae;
+  --color-line: #e6ecef;
+  --color-panel: #f4f7f8;
+  --color-navy: #2c6d85;
+  --color-navy-2: #3a87a0;
+  --color-gold: #6cc06a;
+  --color-gold-2: #3f9163;
+  --color-gold-soft: #ecf6e9;
 }
 
 :root {
@@ -30,14 +33,7 @@
 }
 
 body {
-  background:
-    radial-gradient(60rem 40rem at 92% -10%, #f6f8fc 0%, transparent 60%),
-    radial-gradient(50rem 40rem at 0% 110%, #e3e8f3 0%, transparent 60%),
-    #e8ecf4;
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  direction: rtl; /* Full RTL Hebrew layout standard */
-  -webkit-font-smoothing: antialiased;
+  direction: rtl; /* Full RTL Hebrew layout; colours, font and background come from the Orbit styles */
 }
 
 input, select, textarea {
@@ -78,7 +74,7 @@ input, select, textarea {
 
 /* ---------- Motion ---------- */
 /* Mobile drawer slide-in animation (from the right for RTL) */
-@keyframes slideIn {
+@keyframes mSlideIn {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
@@ -102,17 +98,17 @@ input, select, textarea {
 .page-enter > * > .fixed { animation: none; }
 
 /* Modals / popovers */
-@keyframes popIn {
+@keyframes mPopIn {
   from { opacity: 0; transform: translateY(8px) scale(0.97); }
   to { opacity: 1; transform: none; }
 }
-.pop-in { animation: popIn 0.28s var(--out) both; }
+.pop-in { animation: mPopIn 0.28s var(--out) both; }
 
-@keyframes toastIn {
+@keyframes mToastIn {
   from { opacity: 0; transform: translateY(16px) scale(0.96); }
   to { opacity: 1; transform: none; }
 }
-.toast-in { animation: toastIn 0.35s var(--spring) both; }
+.toast-in { animation: mToastIn 0.35s var(--spring) both; }
 
 @keyframes shrink {
   from { transform: scaleX(1); }

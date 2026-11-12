@@ -15,7 +15,9 @@ import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
 import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
-import DashboardView from './components/DashboardView';
+import OrbitDashboard from './orbit/Dashboard';
+import OIcon from './orbit/Icon';
+import { PageHead, Select as OSelect } from './orbit/kit';
 import ExpensesPage from './pages/ExpensesPage';
 import DebtsPage from './pages/DebtsPage';
 import IncomeView from './components/IncomeView';
@@ -596,15 +598,30 @@ export default function App() {
 
   // Navigation schema (grouped like a SaaS sidebar)
   const navItems = [
-    { id: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard, group: 'ראשי', desc: 'תמונת מצב של החודש: מאזן, תשלומים, חובות ושכר' },
-    { id: 'income', label: 'הכנסות', icon: Coins, group: 'כספים', desc: 'כל ההכנסות של החודש לפי מקור' },
-    { id: 'fixed_expenses', label: 'הוצאות קבועות', icon: FileText, group: 'כספים', desc: 'תשלומים קבועים שחוזרים כל חודש' },
-    { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard, group: 'כספים', desc: 'רכש, ספקים ותשלומים משתנים' },
-    { id: 'debts', label: 'חובות והלוואות', icon: Landmark, group: 'כספים', desc: 'הלוואות, יתרות וכמה תשלומים נותרו' },
-    { id: 'deliveries', label: 'שליחויות', icon: Truck, group: 'כספים', desc: 'משלוחים והפצה, נטו וכולל מע״מ' },
-    { id: 'employees', label: 'עובדים ושכר', icon: User, group: 'צוות', desc: 'שכר, עמלות וסטטוס תשלום לכל איש צוות' },
+    { id: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard, oicon: 'dashboard', group: 'ראשי', desc: 'תמונת מצב של החודש: מאזן, תשלומים, חובות ושכר' },
+    { id: 'income', label: 'הכנסות', icon: Coins, oicon: 'coins', group: 'כספים', desc: 'כל ההכנסות של החודש לפי מקור' },
+    { id: 'fixed_expenses', label: 'הוצאות קבועות', icon: FileText, oicon: 'receipt', group: 'כספים', desc: 'תשלומים קבועים שחוזרים כל חודש' },
+    { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard, oicon: 'card', group: 'כספים', desc: 'רכש, ספקים ותשלומים משתנים' },
+    { id: 'debts', label: 'חובות והלוואות', icon: Landmark, oicon: 'bank', group: 'כספים', desc: 'הלוואות, יתרות וכמה תשלומים נותרו' },
+    { id: 'deliveries', label: 'שליחויות', icon: Truck, oicon: 'truck', group: 'כספים', desc: 'משלוחים והפצה, נטו וכולל מע״מ' },
+    { id: 'employees', label: 'עובדים ושכר', icon: User, oicon: 'users', group: 'צוות', desc: 'שכר, עמלות וסטטוס תשלום לכל איש צוות' },
   ];
   const navGroups = ['ראשי', 'כספים', 'צוות'];
+
+  // Paid vs. still open this month (fixed + variable + debt installments) — sidebar card + badges
+  const unpaidOf = (list: { status?: string }[]) => list.filter((x) => (x.status || 'לא שולם') !== 'שולם').length;
+  const paidAll =
+    fixedExpenses.filter((e) => e.status === 'שולם').reduce((a, e) => a + (Number(e.amount) || 0), 0) +
+    variableExpenses.filter((e) => e.status === 'שולם').reduce((a, e) => a + (Number(e.amount) || 0), 0) +
+    debts.filter((d) => d.status === 'שולם').reduce((a, d) => a + (Number(d.monthly_payment) || 0), 0);
+  const leftAll = totalExpensesCalc - paidAll;
+  const paidPctAll = totalExpensesCalc > 0 ? Math.round((paidAll / totalExpensesCalc) * 100) : 0;
+  const navBadges: Record<string, { n: number; hot?: boolean } | undefined> = {
+    fixed_expenses: unpaidOf(fixedExpenses) ? { n: unpaidOf(fixedExpenses) } : undefined,
+    variable_expenses: unpaidOf(variableExpenses) ? { n: unpaidOf(variableExpenses) } : undefined,
+    debts: unpaidOf(debts) ? { n: unpaidOf(debts), hot: debts.some((d) => d.mood === 'angry' && d.status !== 'שולם') } : undefined,
+    employees: employees.length ? { n: employees.length } : undefined
+  };
   const currentNav = navItems.find((n) => n.id === activePage) || navItems[0];
 
   // Ctrl+K / ⌘K opens the command palette from anywhere
@@ -628,13 +645,24 @@ export default function App() {
     }
   }, [sideCollapsed]);
 
-  // White pill that slides behind the active sidebar item
-  const navRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [pill, setPill] = useState<{ top: number; height: number } | null>(null);
+  // White pill that slides behind the active sidebar item (Orbit)
+  const navRef = useRef<HTMLElement | null>(null);
+  const navPillRef = useRef<HTMLSpanElement | null>(null);
   useLayoutEffect(() => {
-    const el = navRefs.current[activePage];
-    if (el) setPill({ top: el.offsetTop, height: el.offsetHeight });
-  }, [activePage, sideCollapsed, currentUser, authChecking]);
+    const item = navRef.current?.querySelector<HTMLElement>(`[data-nav="${activePage}"]`);
+    const pill = navPillRef.current;
+    if (!pill) return;
+    if (!item) {
+      pill.style.opacity = '0';
+      return;
+    }
+    pill.style.opacity = '1';
+    pill.style.transform = `translateY(${item.offsetTop}px)`;
+    pill.style.height = `${item.offsetHeight}px`;
+  }, [activePage, sideCollapsed, currentUser, authChecking, isLoadingMonths]);
+  const monthOptions = [...months]
+    .sort((a, b) => b.year - a.year || b.month_number - a.month_number)
+    .map((m) => ({ id: m.id, label: m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}` }));
 
   // Everything the palette can jump to: pages, months, actions, and this month's records
   const goTo = (page: ActivePage) => {
@@ -684,74 +712,52 @@ export default function App() {
   const sortedMonths = [...months].sort((a, b) => a.year - b.year || a.month_number - b.month_number);
 
   return (
-    <div className="min-h-screen text-ink font-sans antialiased text-right md:p-4 lg:p-5">
-      {/* Frame: navy brand gradient that holds the sidebar and the light panel */}
-      <div
-        className={`mx-auto max-w-[1680px] md:min-h-[calc(100vh-2rem)] lg:min-h-[calc(100vh-2.5rem)] md:rounded-[2.2rem] md:p-2.5 md:ps-0 md:grid transition-[grid-template-columns] duration-500 ${
-          sideCollapsed ? 'md:grid-cols-[5.4rem_minmax(0,1fr)]' : 'md:grid-cols-[15.5rem_minmax(0,1fr)]'
-        }`}
-        style={{
-          background:
-            'radial-gradient(38rem 26rem at 100% -10%, rgb(217 180 85 / 0.18), transparent 60%), radial-gradient(30rem 30rem at 0% 110%, rgb(255 255 255 / 0.06), transparent 60%), linear-gradient(165deg, #2a377a 0%, #1b2660 38%, #16204f 70%, #0f1638 100%)',
-          boxShadow: '0 30px 70px -30px rgb(22 32 79 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.12)'
-        }}
-      >
+    <div className="app">
+      {/* Frame: Orbit's green gradient that holds the sidebar and the light panel */}
+      <div className={`frame ${sideCollapsed ? 'is-collapsed' : ''}`}>
         {/* ---------- Sidebar (desktop) ---------- */}
-        <aside className="hidden md:flex relative flex-col text-white py-6 px-3.5 min-w-0">
-          {/* collapse toggle, on the edge facing the panel */}
-          <button
-            onClick={() => setSideCollapsed((c) => !c)}
-            className="absolute top-7 -left-3.5 z-10 w-7 h-7 grid place-items-center rounded-full bg-white text-navy shadow-pop hover:scale-110 transition-transform cursor-pointer"
-            title={sideCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
-            aria-label={sideCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
-          >
-            <PanelRightClose className={`w-3.5 h-3.5 transition-transform duration-500 ${sideCollapsed ? 'rotate-180' : ''}`} />
+        <aside className="side" aria-label="ניווט ראשי">
+          <button className="side-toggle" onClick={() => setSideCollapsed((c) => !c)} aria-label={sideCollapsed ? 'הרחבת התפריט' : 'כיווץ התפריט'}>
+            <OIcon name="chevronRight" />
           </button>
 
-          {/* brand */}
-          <div className={`flex items-center gap-3 mb-7 ${sideCollapsed ? 'justify-center' : 'px-1.5'}`}>
-            <BrandLogo size={44} cutout="#1b2660" className="drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)] shrink-0" />
-            {!sideCollapsed && (
-              <div className="min-w-0">
-                <div className="text-[17px] font-extrabold tracking-tight leading-none">ICE DIAMONDS</div>
-                <div className="text-[11px] font-medium text-gold mt-1">מערכת ניהול כספים</div>
-              </div>
-            )}
-          </div>
+          <button className="brand" onClick={() => setActivePage('dashboard')} data-tip="Ice Diamonds">
+            <span className="brand-mark ice-brand-mark">
+              <BrandLogo size={30} cutout="#ffffff" />
+            </span>
+            <span className="brand-text fade-label">
+              <strong>Ice Diamonds</strong>
+              <span>מערכת ניהול כספים</span>
+            </span>
+          </button>
 
-          {/* nav */}
-          <nav className="relative">
-            {pill && (
-              <div
-                className="absolute inset-x-0 z-0 rounded-2xl bg-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.5)] transition-[transform,height] duration-500"
-                style={{ transform: `translateY(${pill.top}px)`, height: pill.height, transitionTimingFunction: 'var(--spring)', top: 0 }}
-              />
-            )}
-            {navGroups.map((g) => (
-              <div key={g} className="mb-3">
-                <div className={`h-7 flex items-center text-[10.5px] font-semibold tracking-[0.14em] text-white/50 ${sideCollapsed ? 'justify-center' : 'px-3'}`}>
-                  {sideCollapsed ? <span className="w-5 h-px bg-white/30" /> : g}
-                </div>
+          <nav className="nav" ref={navRef}>
+            <span className="nav-pill" ref={navPillRef} aria-hidden="true" />
+            {navGroups.map((g, gi) => (
+              <div className="nav-group" key={g}>
+                <p className="nav-caption" style={{ '--i': gi * 5 }}>
+                  <span className="fade-label">{g}</span>
+                </p>
                 {navItems
                   .filter((n) => n.group === g)
-                  .map((item) => {
-                    const Icon = item.icon;
+                  .map((item, i) => {
                     const isActive = activePage === item.id;
+                    const badge = navBadges[item.id];
                     return (
                       <button
                         id={`side-nav-${item.id}`}
                         key={item.id}
-                        ref={(el) => {
-                          navRefs.current[item.id] = el;
-                        }}
+                        data-nav={item.id}
+                        data-tip={item.label}
+                        className={`nav-item ${isActive ? 'is-active' : ''}`}
+                        style={{ '--i': gi * 5 + i + 1 }}
                         onClick={() => setActivePage(item.id as ActivePage)}
-                        title={sideCollapsed ? item.label : undefined}
-                        className={`relative z-[1] w-full flex items-center gap-3 h-11 mb-0.5 rounded-2xl text-[14.5px] transition-colors cursor-pointer ${
-                          sideCollapsed ? 'justify-center' : 'px-3.5 text-right'
-                        } ${isActive ? 'text-navy font-bold' : 'text-white/85 hover:bg-white/10 font-medium'}`}
+                        aria-current={isActive ? 'page' : undefined}
                       >
-                        <Icon className={`w-[19px] h-[19px] shrink-0 transition-colors ${isActive ? 'text-gold-2' : ''}`} />
-                        {!sideCollapsed && <span className="truncate">{item.label}</span>}
+                        <OIcon name={item.oicon} />
+                        <span className="nav-label">{item.label}</span>
+                        {badge ? <span className={`nav-badge ${badge.hot ? 'is-hot' : ''}`}>{badge.n}</span> : null}
+                        {badge?.hot ? <i className="nav-dot" aria-hidden="true" /> : null}
                       </button>
                     );
                   })}
@@ -759,164 +765,110 @@ export default function App() {
             ))}
           </nav>
 
-          {/* footer: status + user */}
-          <div className="mt-auto pt-4 space-y-3">
-            {!sideCollapsed && (
-              <div className="rounded-2xl border border-white/15 bg-white/[0.07] px-3.5 py-3">
-                <div className="flex items-center gap-2 text-xs font-medium">
-                  <span className={`w-2 h-2 rounded-full ${isLiveSupabase ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
-                  {isLiveSupabase ? 'מחובר ומסונכרן' : 'מצב הדגמה'}
-                </div>
-                <div className="text-[11px] text-white/55 mt-1">הנתונים נשמרים אוטומטית</div>
+          <div className="side-foot" style={{ '--i': 16 }}>
+            <button className="goal" onClick={() => setActivePage('dashboard')}>
+              <div className="goal-top">
+                <span>שולם החודש</span>
+                <b>{paidPctAll}%</b>
               </div>
-            )}
-            <div className={`flex items-center gap-2.5 pt-3 border-t border-white/15 ${sideCollapsed ? 'flex-col' : ''}`}>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f6e4b0] to-gold text-navy grid place-items-center font-black text-xs shrink-0 ring-2 ring-white/70">
-                {initials}
+              <div className="goal-bar">
+                <i style={{ width: `${paidPctAll}%` }} />
               </div>
-              {!sideCollapsed && (
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-semibold truncate" title={currentUser.email}>{currentUser.email}</div>
-                  <div className="text-[11px] text-white/55">מנהל</div>
-                </div>
-              )}
-              <button
-                id="desktop-logout-btn"
-                onClick={handleLogout}
-                className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-                title="יציאה"
-                aria-label="יציאה"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <p>
+                {ils0(paidAll)} מתוך {ils0(paidAll + leftAll)}
+              </p>
+            </button>
+
+            <button className="nav-item" data-tip="חיפוש מהיר" onClick={() => setPaletteOpen(true)}>
+              <OIcon name="search" />
+              <span className="nav-label">חיפוש מהיר</span>
+              <span className="nav-badge" dir="ltr">Ctrl K</span>
+            </button>
+            <button className="nav-item" data-tip="יציאה" onClick={handleLogout} id="desktop-logout-btn">
+              <OIcon name="logout" />
+              <span className="nav-label">יציאה</span>
+            </button>
+
+            <div className="profile">
+              <div className="profile-btn" data-tip={currentUser.email}>
+                <span className="avatar avatar--initials profile-avatar">{initials}</span>
+                <span className="profile-text">
+                  <strong dir="ltr" className="ice-email">{currentUser.email}</strong>
+                  <span>{isLiveSupabase ? 'מחובר ומסונכרן' : 'מצב הדגמה'}</span>
+                </span>
+              </div>
             </div>
           </div>
         </aside>
 
         {/* ---------- Light panel ---------- */}
-        <div className="min-w-0 bg-panel md:rounded-[1.9rem] min-h-screen md:min-h-0 flex flex-col shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.7)]">
-          {/* Mobile top bar */}
-          <div className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-16 bg-navy text-white">
-            <div className="flex items-center gap-2.5">
-              <BrandLogo size={36} cutout="#16204f" />
+        <div className="panel">
+          {/* Mobile top bar (phones keep the hamburger menu) */}
+          <div className="ice-mbar">
+            <div className="ice-mbar-brand">
+              <span className="ice-brand-mark">
+                <BrandLogo size={26} cutout="#ffffff" />
+              </span>
               <div>
-                <div className="text-sm font-extrabold leading-none">ICE DIAMONDS</div>
-                <div className="text-[10px] text-gold mt-0.5">מערכת ניהול כספים</div>
+                <strong>Ice Diamonds</strong>
+                <span>מערכת ניהול כספים</span>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => setPaletteOpen(true)} className="p-2 rounded-full hover:bg-white/10 cursor-pointer" aria-label="חיפוש">
-                <Search className="w-5 h-5" />
+            <div className="ice-mbar-actions">
+              <button onClick={() => setPaletteOpen(true)} aria-label="חיפוש">
+                <OIcon name="search" />
               </button>
-              <button
-                id="mob-menu-toggle"
-                onClick={() => setMobileNavOpen(true)}
-                className="p-2 rounded-full hover:bg-white/10 cursor-pointer"
-                title="תפריט"
-                aria-label="תפריט"
-              >
+              <button id="mob-menu-toggle" onClick={() => setMobileNavOpen(true)} aria-label="תפריט">
                 <Menu className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <div className="flex-1 px-4 sm:px-6 lg:px-9 py-5 lg:py-8">
-            {/* Page head + controls */}
-            <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-6">
-              <div key={activePage} className="page-enter">
-                <div>
-                  <h1 className="text-[26px] sm:text-[32px] font-extrabold tracking-tight text-ink leading-tight">{currentNav.label}</h1>
-                  <p className="text-sm text-muted mt-1">{currentNav.desc}</p>
-                </div>
+          {activePage !== 'dashboard' && (
+            <div key={activePage}><PageHead title={currentNav.label} sub={currentNav.desc}>
+              <button type="button" className="btn btn--ghost ice-hide-sm" onClick={() => setPaletteOpen(true)}>
+                <OIcon name="search" /> חיפוש <kbd className="ice-kbd" dir="ltr">Ctrl K</kbd>
+              </button>
+              <OSelect value={activeMonthId} options={monthOptions} onChange={setActiveMonthId} icon="calendar" label="חודש" align="end" />
+              <button type="button" className="icon-btn icon-btn--soft" onClick={() => setIsAddingMonthModal(true)} aria-label="הוספת חודש חדש" title="הוספת חודש חדש" id="trigger-add-month-modal">
+                <OIcon name="plus" />
+              </button>
+              <button type="button" className="btn btn--primary" onClick={handleExportMonth} disabled={isExporting || !activeMonthId} id="export-month-excel">
+                <OIcon name="download" /> {isExporting ? 'מייצא...' : 'ייצוא לאקסל'}
+              </button>
+            </PageHead></div>
+          )}
+
+          {/* Page — re-keyed so each page / month change plays the entrance */}
+          <main key={`${activePage}-${activeMonthId}`} className="main ice-main">
+            {isLoadingData ? (
+              <div className="card ice-loading">
+                <BrandLogo size={48} cutout="#ffffff" className="animate-pulse" />
+                <p>טוען את נתוני החודש...</p>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Search / command palette */}
-                <button
-                  onClick={() => setPaletteOpen(true)}
-                  className="hidden md:flex items-center gap-2.5 h-10 w-56 lg:w-64 px-3.5 bg-white border border-line rounded-xl text-sm text-muted hover:border-navy/30 transition-colors cursor-pointer"
-                >
-                  <Search className="w-4 h-4" />
-                  <span className="flex-1 text-right">חיפוש מהיר...</span>
-                  <kbd className="text-[10.5px] font-semibold bg-panel border border-line rounded-md px-1.5 py-0.5" dir="ltr">Ctrl K</kbd>
-                </button>
-
-                {/* Month selector */}
-                <div className="relative flex items-center h-10 bg-white border border-line rounded-xl hover:border-navy/30 transition-colors">
-                  <CalendarDays className="w-4 h-4 text-gold-2 absolute right-3 pointer-events-none" />
-                  <select
-                    id="month-selector-dropdown"
-                    value={activeMonthId}
-                    onChange={(e) => setActiveMonthId(e.target.value)}
-                    className="h-full bg-transparent text-sm font-bold text-ink outline-none cursor-pointer appearance-none pr-9 pl-8"
-                    aria-label="בחירת חודש"
-                  >
-                    {isLoadingMonths ? (
-                      <option>נטען...</option>
-                    ) : (
-                      sortedMonths.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-muted absolute left-2.5 pointer-events-none" />
-                </div>
-
-                <button
-                  id="trigger-add-month-modal"
-                  onClick={() => setIsAddingMonthModal(true)}
-                  className="h-10 w-10 grid place-items-center bg-white border border-line rounded-xl text-navy hover:border-navy/30 hover:bg-gold-soft transition-colors cursor-pointer"
-                  title="הוסף חודש חדש"
-                  aria-label="הוסף חודש חדש"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-
-                <button
-                  id="export-month-excel"
-                  onClick={handleExportMonth}
-                  disabled={isExporting || !activeMonthId}
-                  className="h-10 flex items-center gap-2 px-4 bg-navy hover:bg-navy-2 text-white rounded-xl text-sm font-semibold shadow-lg shadow-navy/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-                  title="ייצוא החודש לאקסל"
-                >
-                  <Download className={`w-4 h-4 text-gold ${isExporting ? 'animate-bounce' : ''}`} />
-                  <span className="hidden sm:inline">{isExporting ? 'מייצא...' : 'ייצוא לאקסל'}</span>
-                </button>
-              </div>
-            </header>
-
-
-        {/* Dynamic Panel Workspace — re-keyed so each page / month change plays the entrance */}
-        <main key={`${activePage}-${activeMonthId}`} className="page-enter min-w-0">
-          {isLoadingData ? (
-            <div className="bg-white shadow-card rounded-3xl p-16 text-center space-y-4">
-              <Diamond className="w-10 h-10 animate-spin text-gold mx-auto" />
-              <p className="text-muted text-sm font-semibold">טוען את נתוני החודש...</p>
-            </div>
-          ) : (
-            <>
-              {activePage === 'dashboard' && (
-                <DashboardView
-                  fixedExpenses={fixedExpenses}
-                  variableExpenses={variableExpenses}
-                  debts={debts}
-                  incomeEntries={incomeEntries}
-                  deliveries={deliveries}
-                  selectedMonthName={activeMonthName}
-                  onSaveFixedExpense={handleSaveFixedExpense}
-                  onSaveVariableExpense={handleSaveVariableExpense}
-                  onSaveDebt={handleSaveDebt}
-                  employees={employees}
-                  employeeMonths={employeeMonths}
-                  onOpenEmployees={() => setActivePage('employees')}
-                  months={months}
-                  activeMonthId={activeMonthId}
-                  onNavigate={(p) => setActivePage(p)}
-                  notify={pushToast}
-                />
-              )}
+            ) : (
+              <>
+                {activePage === 'dashboard' && (
+                  <OrbitDashboard
+                    fixedExpenses={fixedExpenses}
+                    variableExpenses={variableExpenses}
+                    debts={debts}
+                    incomeEntries={incomeEntries}
+                    months={months}
+                    activeMonthId={activeMonthId}
+                    onChangeMonth={setActiveMonthId}
+                    onAddMonth={() => setIsAddingMonthModal(true)}
+                    onExport={handleExportMonth}
+                    exporting={isExporting}
+                    onSaveFixedExpense={handleSaveFixedExpense}
+                    onSaveVariableExpense={handleSaveVariableExpense}
+                    onSaveDebt={handleSaveDebt}
+                    employees={employees}
+                    employeeMonths={employeeMonths}
+                    onNavigate={(p: ActivePage) => setActivePage(p)}
+                    notify={pushToast}
+                  />
+                )}
 
               {activePage === 'fixed_expenses' && (
                 <ExpensesPage
@@ -984,8 +936,7 @@ export default function App() {
               )}
             </>
           )}
-        </main>
-          </div>
+          </main>
         </div>
       </div>
 
@@ -994,22 +945,22 @@ export default function App() {
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-navy/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-[#1c3a33]/35 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           ></div>
 
           {/* Drawer panel (slides in from the right for RTL) */}
           <div
-            className="absolute top-0 right-0 h-full w-72 max-w-[82%] text-white flex flex-col animate-[slideIn_0.25s_var(--out)] rounded-l-3xl overflow-hidden"
-            style={{ background: 'linear-gradient(165deg, #2a377a 0%, #1b2660 45%, #16204f 100%)' }}
+            className="absolute top-0 right-0 h-full w-72 max-w-[82%] text-white flex flex-col animate-[mSlideIn_0.25s_var(--out)] rounded-l-3xl overflow-hidden"
+            style={{ background: 'linear-gradient(162deg, #82ce71 0%, #67b962 30%, #58a961 58%, #4b9a71 80%, #3a7f8f 100%)' }}
           >
             {/* Drawer header */}
             <div className="flex items-center justify-between px-5 h-20 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <BrandLogo size={38} cutout="#2a377a" className="shrink-0" />
+                <span className="ice-brand-mark"><BrandLogo size={28} cutout="#ffffff" /></span>
                 <div className="flex flex-col">
                   <span className="text-sm font-extrabold leading-none">ICE DIAMONDS</span>
-                  <span className="text-[10px] text-gold mt-1">מערכת ניהול כספים</span>
+                  <span className="text-[10px] text-white/80 mt-1">מערכת ניהול כספים</span>
                 </div>
               </div>
               <button
@@ -1077,7 +1028,7 @@ export default function App() {
 
       {/* 5. Add Month Modal Popup */}
       {isAddingMonthModal && (
-        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-[#1c3a33]/35 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="pop-in bg-white shadow-pop border border-line p-6 rounded-3xl max-w-sm w-full space-y-4">
             <h3 className="text-base font-bold text-ink flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gold-2" />
@@ -1174,7 +1125,7 @@ export default function App() {
 
       {/* Overdue-payment toast (bottom-right, once per load) */}
       {payNotif && payNotif.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-white border border-rose-200 rounded-2xl overflow-hidden animate-[slideIn_0.25s_ease-out]">
+        <div className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-white border border-rose-200 rounded-2xl overflow-hidden animate-[mSlideIn_0.25s_ease-out]">
           <div className="flex items-start justify-between gap-3 px-4 py-3 bg-rose-50 border-b border-rose-200">
             <div className="flex items-center gap-2">
               <span className="text-lg">⏰</span>

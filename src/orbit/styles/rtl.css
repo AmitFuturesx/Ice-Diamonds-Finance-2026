@@ -1,0 +1,285 @@
+/* ------------------------------------------------------------------
+   Hebrew / RTL layer on top of the Orbit styles.
+   The Orbit files were converted to logical properties (inline-start/end),
+   so they flip by themselves under dir="rtl". The few transforms that move
+   things sideways read --x-dir / --o-start from here.
+------------------------------------------------------------------- */
+:root {
+  --o-start: left;
+  --x-dir: 1;
+}
+[dir='rtl'] {
+  --o-start: right;
+  --x-dir: -1;
+}
+
+/* Latin + digits in Montserrat (like the template), Hebrew falls back to Heebo */
+body {
+  font-family: 'Montserrat', 'Heebo', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Charts keep a left-to-right time axis; their absolute labels/tooltips are positioned in LTR space */
+.tk-x,
+.tk-canvas,
+.barchart,
+.sv-chart,
+.spark {
+  direction: ltr;
+}
+
+/* mirrored sideways moves */
+.task.is-lifted {
+  transform: translate(calc(2.8rem * var(--x-dir)), -0.35rem);
+}
+[dir='rtl'] .file-tab::after {
+  background: radial-gradient(circle at 0 0, transparent 1rem, var(--fc) calc(1rem + 0.6px));
+}
+
+/* ---------------- shell additions ---------------- */
+.ice-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.95);
+  box-shadow: 0 6px 14px -6px rgb(10 40 30 / 0.45);
+}
+.ice-brand-mark svg {
+  width: 72%;
+  height: 72%;
+}
+.ice-email {
+  display: block;
+  max-width: 10.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: end;
+}
+.ice-main {
+  min-width: 0;
+}
+.ice-loading {
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+  padding: 4rem 1rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.ice-kbd {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.4rem;
+  background: var(--panel);
+  color: var(--muted);
+  font-family: inherit;
+}
+.ice-mbar {
+  display: none;
+}
+
+/* phones: no green frame/rail — a top bar with a hamburger menu instead (Amit's preference) */
+@media (max-width: 767px) {
+  html {
+    font-size: 13px;
+  }
+  .app {
+    padding: 0;
+  }
+  .frame,
+  .frame.is-collapsed {
+    display: block;
+    padding: 0;
+    min-height: 100vh;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .side {
+    display: none;
+  }
+  .panel {
+    min-height: 100vh;
+    padding: 0 1rem 2.5rem;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .ice-mbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0 -1rem 1.4rem;
+    padding: 0.75rem 1rem;
+    color: #fff;
+    background: linear-gradient(162deg, #82ce71 0%, #67b962 35%, #58a961 65%, #3a7f8f 120%);
+    box-shadow: 0 10px 24px -16px rgb(40 110 80 / 0.7);
+  }
+  .ice-mbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .ice-mbar-brand .ice-brand-mark {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+  .ice-mbar-brand strong {
+    display: block;
+    font-size: 1.05rem;
+    line-height: 1.1;
+  }
+  .ice-mbar-brand span {
+    font-size: 0.75rem;
+    opacity: 0.85;
+  }
+  .ice-mbar-actions {
+    display: flex;
+    gap: 0.3rem;
+  }
+  .ice-mbar-actions button {
+    width: 2.6rem;
+    height: 2.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #fff;
+  }
+  .ice-mbar-actions button:active {
+    background: rgb(255 255 255 / 0.2);
+  }
+  .ice-hide-sm {
+    display: none !important;
+  }
+  .page-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------------- Ice Diamonds additions (same visual language) ---------------- */
+.ice-board-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.ice-month {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pill.is-click {
+  cursor: pointer;
+  transition: scale 0.25s var(--spring), box-shadow 0.2s;
+}
+.pill.is-click:hover {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.pill.is-click:active {
+  scale: 0.94;
+}
+.mood-emoji {
+  font-size: 0.95em;
+  line-height: 1;
+}
+.ice-span {
+  grid-column: 1 / -1;
+}
+.task-amt {
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.task-mood {
+  margin-inline-start: auto;
+  align-self: flex-start;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.75);
+  font-size: 1rem;
+  transition: scale 0.25s var(--spring);
+}
+.task-mood:hover {
+  scale: 1.12;
+}
+
+/* drawer list of payments */
+.ob-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1.3rem 0 1rem;
+}
+.ob-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem 1rem;
+  padding: 0.95rem 1.05rem;
+  border-radius: 1.1rem;
+  background: var(--row-grey);
+  transition: opacity 0.3s, background-color 0.3s;
+}
+.ob-row:nth-child(odd) {
+  background: var(--row-green);
+}
+.ob-row.is-paid {
+  opacity: 0.6;
+}
+.ob-row.is-paid .ob-main b {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted);
+}
+.ob-main {
+  min-width: 0;
+}
+.ob-main b {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ob-main span {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.ob-amount {
+  font-size: 0.98rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ob-pills {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.ob-hint {
+  margin-bottom: 1rem;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.ob-arrow {
+  transform: scaleX(var(--x-dir));
+}
+
+/* Hebrew reads better a touch larger and without negative tracking */
+.page-head h1,
+.sec-title,
+.card-title {
+  letter-spacing: 0;
+}

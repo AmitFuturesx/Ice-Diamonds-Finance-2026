@@ -25,9 +25,9 @@ import type { PaymentStatus } from '../types';
 type IconT = ComponentType<{ className?: string }>;
 
 export const TONES = {
-  navy: '#24316e',
-  gold: '#c9a13f',
-  green: '#10b981',
+  navy: '#2c6d85',
+  gold: '#6cc06a',
+  green: '#57b05c',
   red: '#f43f5e',
   amber: '#f59e0b',
   sky: '#0ea5e9',

@@ -1,0 +1,539 @@
+/* ------------------------------------------------------------------
+   Popovers & menus
+------------------------------------------------------------------- */
+.pop-anchor {
+  position: relative;
+}
+.pop {
+  position: absolute;
+  z-index: 40;
+  min-width: 13rem;
+  padding: 0.55rem;
+  border-radius: 1.2rem;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: var(--sh-pop);
+  font-weight: 500;
+  white-space: normal;
+  animation: popIn 0.24s var(--out) both;
+}
+.pop--menu {
+  inset-inline-end: 0;
+  top: calc(100% + 0.5rem);
+  transform-origin: top right;
+}
+.pop--up {
+  top: auto;
+  bottom: calc(100% + 0.5rem);
+  transform-origin: bottom right;
+}
+.pop--side {
+  inset-inline-start: calc(100% + 1.6rem);
+  bottom: -0.4rem;
+  transform-origin: bottom left;
+}
+.frame.is-collapsed .pop--side {
+  inset-inline-start: calc(100% + 2.4rem);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.75rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background-color 0.18s;
+}
+.menu-item:hover {
+  background: #f1f5f6;
+}
+.menu-item .icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--muted);
+}
+.menu-item.is-on {
+  color: var(--teal);
+  font-weight: 600;
+}
+.menu-item.is-on .icon {
+  color: var(--teal);
+}
+.menu-item.is-danger,
+.menu-item.is-danger .icon {
+  color: var(--red);
+}
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.6rem 0.7rem;
+}
+.pop h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+/* notifications */
+.pop--notifs {
+  width: 22.5rem;
+}
+.notif-list {
+  max-height: 22rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.notif {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.6rem;
+  border-radius: 0.9rem;
+  text-align: start;
+  transition: background-color 0.18s;
+}
+.notif:hover {
+  background: #f3f6f7;
+}
+.notif-ic {
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+}
+.notif-ic .icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.tone-green {
+  background: var(--green-soft);
+  color: var(--green-3);
+}
+.tone-blue {
+  background: var(--t-blue);
+  color: var(--teal-2);
+}
+.tone-teal {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.tone-peach {
+  background: var(--t-peach);
+  color: #b06a0a;
+}
+.tone-red {
+  background: #fde8e6;
+  color: var(--red);
+}
+.notif-text {
+  position: relative;
+  flex: 1;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.notif-text b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.notif-text em {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  font-style: normal;
+  color: var(--muted);
+}
+.notif.is-unread .notif-text::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 0;
+  top: 0.35rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--green);
+}
+.notif.is-unread .notif-text {
+  padding-inline-end: 1rem;
+}
+
+/* settings */
+.pop--settings {
+  width: 17.5rem;
+  padding: 1rem;
+}
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  margin: 0.7rem 0 0.9rem;
+  padding: 0.25rem;
+  border-radius: 0.85rem;
+  background: #f0f4f5;
+}
+.seg button {
+  padding: 0.45rem 0.3rem;
+  border-radius: 0.65rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ink-2);
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
+}
+.seg button.is-on {
+  background: #fff;
+  color: var(--teal);
+  box-shadow: 0 2px 8px -3px rgb(20 50 45 / 0.25);
+}
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.55rem 0.2rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.switch {
+  position: relative;
+  width: 2.3rem;
+  height: 1.35rem;
+  border-radius: 99px;
+  background: #d9e2e5;
+  transition: background-color 0.25s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0.18rem;
+  top: 0.18rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  transition: translate 0.35s var(--spring);
+}
+.switch.is-on {
+  background: var(--green);
+}
+.switch.is-on::after {
+  translate: calc(0.95rem * var(--x-dir)) 0;
+}
+
+/* profile */
+.pop--profile {
+  width: 16.5rem;
+}
+.pop-user {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.55rem 0.8rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.pop-user-avatar {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+.pop-user strong {
+  display: block;
+  font-size: 0.88rem;
+}
+.pop-user span {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------
+   Buttons
+------------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  height: 2.8rem;
+  padding: 0 1.2rem;
+  border-radius: 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition:
+    background-color 0.2s,
+    translate 0.25s var(--spring),
+    box-shadow 0.25s;
+}
+.btn .icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.btn:hover {
+  translate: 0 -1px;
+}
+.btn:active {
+  translate: 0 1px;
+}
+.btn--primary {
+  background: var(--teal);
+  color: #fff;
+  box-shadow: 0 8px 18px -8px rgb(44 109 133 / 0.7);
+}
+.btn--primary:hover {
+  background: #255f74;
+}
+.btn--ghost {
+  background: #eef3f4;
+  color: var(--ink-2);
+}
+.btn--ghost:hover {
+  background: #e4ecee;
+}
+.btn--block {
+  width: 100%;
+  height: 2.5rem;
+}
+
+/* ------------------------------------------------------------------
+   Modal: loan file details
+------------------------------------------------------------------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: rgb(22 44 38 / 0.32);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.25s ease both;
+}
+.modal.is-leaving {
+  animation: fadeOut 0.2s ease both;
+}
+.modal-card {
+  width: min(34rem, 100%);
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  padding: 1.8rem;
+  border-radius: 1.8rem;
+  background: #fff;
+  box-shadow: var(--sh-lift);
+  animation: modalIn 0.5s var(--spring) both;
+}
+.modal.is-leaving .modal-card {
+  animation: modalOut 0.2s ease both;
+}
+
+.fd-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+.fd-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.fd-scope .icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.fd-head h3 {
+  margin-top: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.fd-head p {
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.fd-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+}
+.fd-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 1rem;
+  background: #f4f7f8;
+}
+.fd-stats span:first-child {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.fd-stats b {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.fd-stats .badge {
+  margin-top: 0;
+}
+.fd-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1.2rem;
+}
+.bar--lg {
+  max-width: none;
+  height: 0.55rem;
+}
+.fd-progress b {
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.fd-docs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 1.2rem;
+}
+.fd-docs li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--line);
+  animation: rowIn 0.45s var(--out) both;
+  animation-delay: calc(var(--i) * 45ms + 0.15s);
+}
+.fd-doc-ic {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.fd-doc-ic .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.fd-doc-name {
+  flex: 1;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+.fd-docs em {
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+}
+.fd-docs em.is-ok {
+  background: var(--green-soft);
+  color: var(--green-3);
+}
+.fd-docs em.is-wait {
+  background: #fdf0dc;
+  color: #b06a0a;
+}
+.fd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+/* ------------------------------------------------------------------
+   Toasts
+------------------------------------------------------------------- */
+.toasts {
+  position: fixed;
+  inset-inline-end: 1.6rem;
+  bottom: 1.6rem;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.6rem 0.6rem; padding-inline: 0.65rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--ink);
+  color: #fff;
+  box-shadow: var(--sh-pop);
+  font-size: 0.84rem;
+  font-weight: 500;
+  pointer-events: auto;
+  animation: toastIn 0.5s var(--spring) both;
+}
+.toast-ic {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--green);
+}
+.toast-ic--teal {
+  background: var(--teal-2);
+}
+.toast-ic--red {
+  background: var(--red);
+}
+.toast-ic .icon {
+  width: 1rem;
+  height: 1rem;
+  stroke-width: 2.2;
+}
+.toast-text {
+  padding-inline-end: 0.3rem;
+}
+.toast-act {
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.6rem;
+  color: #a9e394;
+  font-weight: 700;
+}
+.toast-act:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+.toast-x {
+  width: 1.8rem;
+  height: 1.8rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.6rem;
+  opacity: 0.6;
+}
+.toast-x:hover {
+  opacity: 1;
+  background: rgb(255 255 255 / 0.1);
+}
+.toast-x .icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}

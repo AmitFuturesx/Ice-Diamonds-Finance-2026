@@ -1,0 +1,265 @@
+/* ------------------------------------------------------------------
+   Motion
+   Page / tab change (Dashboard v14): every page remounts, its cards land
+   one after another (--d), then their content rises in with a soft blur
+   (--i) and the title comes in word by word.
+   Intro (Dashboard v22): --base pushes everything back until the app has
+   opened out of the logo; cards then land with a little 3D tilt.
+------------------------------------------------------------------- */
+.card-in,
+.rise {
+  animation: cardIn 0.65s var(--out) both;
+  animation-delay: calc(var(--base, 0ms) + var(--d, 0) * 60ms);
+}
+/* content rises together with its card, so a card never shows up empty */
+.rv {
+  animation: rv 0.55s var(--out) both;
+  animation-delay: calc(var(--base, 0ms) + var(--d, 0) * 60ms + 40ms + var(--i, 0) * 35ms);
+}
+.page-head .word {
+  animation: wordIn 0.9s var(--out) both;
+  animation-delay: calc(var(--base, 0ms) + var(--i, 0) * 80ms);
+}
+
+/* intro: cards land with v22's tilt */
+.main.is-boot .card-in,
+.main.is-boot .rise {
+  animation-name: cardInBoot;
+  animation-duration: 1s;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1.08);
+  transform-origin: 50% 100%;
+}
+
+/* once a page has landed, anything new (filters, added rows…) animates in quickly */
+.main.settled .card-in,
+.main.settled .rise {
+  animation-delay: 0ms;
+}
+.main.settled .rv {
+  animation-delay: calc(min(var(--i, 0), 8) * 25ms);
+}
+
+.side .nav-item,
+.side .nav-caption,
+.side-foot {
+  animation: slideIn 0.6s var(--out) both;
+  animation-delay: calc(var(--side-base, 0ms) + var(--i, 0) * 40ms + 0.2s);
+}
+.is-booting .side {
+  --side-base: 1000ms;
+}
+.nav-pill {
+  animation: fadeIn 0.6s calc(var(--side-base, 0ms) + 0.5s) backwards;
+}
+.swap-in {
+  animation: swapIn 0.45s var(--out) both;
+}
+
+/* sidebar "jump to section" highlight */
+.spot::after {
+  content: '';
+  position: absolute;
+  inset: -0.55rem;
+  z-index: 20;
+  border: 2px solid var(--green);
+  border-radius: calc(var(--r-card) + 0.5rem);
+  pointer-events: none;
+  animation: spot 1.4s var(--out) forwards;
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.975);
+  }
+}
+@keyframes cardInBoot {
+  from {
+    opacity: 0;
+    transform: perspective(1100px) translateY(36px) rotateX(10deg) scale(0.955);
+  }
+}
+@keyframes rv {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(4px);
+  }
+}
+@keyframes wordIn {
+  from {
+    opacity: 0;
+    transform: translateY(70%) rotate(2deg);
+    filter: blur(10px);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes frameIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+@keyframes swapIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0);
+  }
+}
+@keyframes popCheck {
+  40% {
+    scale: 1.25;
+  }
+}
+@keyframes halo {
+  50% {
+    transform: scale(1.35);
+    opacity: 0.55;
+  }
+}
+@keyframes bob {
+  50% {
+    translate: 0 -6px;
+  }
+}
+@keyframes donutIn {
+  from {
+    opacity: 0;
+    transform: rotate(-120deg) scale(0.6);
+  }
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes dashMove {
+  to {
+    stroke-dashoffset: -200;
+  }
+}
+@keyframes ringIn {
+  from {
+    stroke-dashoffset: var(--C);
+  }
+}
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes taskIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+}
+@keyframes modalOut {
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+}
+@keyframes tipIn {
+  from {
+    opacity: 0;
+    translate: -4px -50%;
+  }
+}
+@keyframes barUp {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes spot {
+  0% {
+    opacity: 1;
+    scale: 0.98;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.03;
+  }
+}
+
+/* respect the OS setting and the in-app "Reduce motion" switch */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
