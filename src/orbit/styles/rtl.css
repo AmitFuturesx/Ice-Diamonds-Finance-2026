@@ -614,3 +614,183 @@ html {
     justify-content: center;
   }
 }
+
+/* toasts: Orbit look + a thin time-left bar for undo */
+.ice-toast {
+  position: relative;
+  overflow: hidden;
+  max-width: min(26rem, calc(100vw - 2rem));
+  font-size: 0.92rem;
+}
+.ice-toast-bar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3px;
+  background: #a9e394;
+  opacity: 0.7;
+  transform-origin: var(--o-start);
+}
+@media (max-width: 767px) {
+  .toasts {
+    inset-inline: 1rem;
+    align-items: stretch;
+  }
+}
+
+/* ---------------- login ---------------- */
+.ice-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--page-bg);
+}
+.ice-login-frame {
+  width: min(62rem, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  padding: 0.9rem;
+  border-radius: 2.6rem;
+  background:
+    radial-gradient(30rem 20rem at 90% -10%, rgb(255 255 255 / 0.22), transparent 60%),
+    linear-gradient(162deg, #82ce71 0%, #67b962 30%, #58a961 58%, #4b9a71 80%, #3a7f8f 100%);
+  box-shadow: 0 30px 70px -30px rgb(40 110 80 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.35);
+  animation: cardIn 0.7s var(--out) both;
+}
+.ice-login-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 2.5rem 2.4rem;
+  color: #fff;
+}
+.ice-login-side h2 {
+  margin-top: 1.2rem;
+  font-size: 2rem;
+  font-weight: 700;
+}
+.ice-login-side p {
+  font-size: 1rem;
+  opacity: 0.85;
+}
+.ice-login-side ul {
+  margin-top: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  font-size: 0.98rem;
+}
+.ice-login-side li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.ice-login-side li .icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0.25rem;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.2);
+  stroke-width: 2.4;
+}
+.ice-login-mark {
+  width: 4.2rem;
+  height: 4.2rem;
+}
+.ice-login-mark--sm {
+  display: none;
+}
+.ice-login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 2.6rem 2.4rem 2rem;
+  border-radius: 2rem;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.7);
+}
+.ice-login-card h1 {
+  font-size: 2rem;
+  font-weight: 700;
+}
+.ice-login-sub {
+  margin-top: -0.6rem;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.ice-login-card .field input {
+  height: 3.2rem;
+  font-size: 1rem;
+  background: #fff;
+}
+.ice-pass {
+  position: relative;
+  display: block;
+}
+.ice-pass input {
+  width: 100%;
+  padding-left: 3rem; /* the field itself is left-to-right */
+}
+.ice-pass .icon-btn {
+  position: absolute;
+  inset-inline-end: 0.5rem;
+  top: 50%;
+  translate: 0 -50%;
+}
+.ice-login-btn {
+  height: 3.3rem;
+  margin-top: 0.4rem;
+  font-size: 1.02rem;
+  justify-content: center;
+}
+.ice-login-error {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1rem;
+  background: #fdecea;
+  color: #b4332b;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.ice-login-error .icon {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.ice-login-foot {
+  margin-top: 0.4rem;
+  text-align: center;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+@media (max-width: 767px) {
+  .ice-login {
+    padding: 0;
+    place-items: stretch;
+  }
+  .ice-login-frame {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 0;
+    padding: 0;
+    min-height: 100vh;
+    align-content: center;
+  }
+  .ice-login-side {
+    display: none;
+  }
+  .ice-login-mark--sm {
+    display: grid;
+    align-self: center;
+  }
+  .ice-login-card {
+    margin: 1rem;
+    padding: 2rem 1.4rem 1.6rem;
+    text-align: center;
+  }
+  .ice-login-card .field {
+    text-align: start;
+  }
+}

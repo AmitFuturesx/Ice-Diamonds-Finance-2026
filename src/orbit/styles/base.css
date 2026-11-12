@@ -1,3 +1,5 @@
+/* Wrapped in the base layer so Tailwind utilities (mobile menu, dialogs) still win over these resets. */
+@layer base {
 /* ------------------------------------------------------------------
    Tokens
    The root font size scales with BOTH viewport width and height, so the
@@ -161,4 +163,6 @@ mark {
   text-align: center;
   font-size: 0.86rem;
   color: var(--muted);
+}
+
 }

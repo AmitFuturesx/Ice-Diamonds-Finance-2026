@@ -39,45 +39,39 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: num
   }, [toast.id, toast.duration, onDismiss]);
 
   const Icon = toast.tone === 'error' ? AlertCircle : toast.action ? Undo2 : CheckCircle2;
-  const iconCls = toast.tone === 'error' ? 'text-rose-500' : toast.action ? 'text-gold' : 'text-emerald-500';
+  const tone = toast.tone === 'error' ? 'toast-ic--red' : toast.action ? 'toast-ic--teal' : '';
 
   return (
-    <div
-      role="status"
-      className="toast-in relative overflow-hidden flex items-center gap-3 min-w-[260px] max-w-[92vw] bg-navy text-white rounded-2xl ps-4 pe-2 py-2.5 shadow-pop"
-    >
-      <Icon className={`w-5 h-5 shrink-0 ${iconCls}`} />
-      <span className="text-sm font-medium flex-1">{toast.message}</span>
+    <div role="status" className="toast ice-toast">
+      <span className={`toast-ic ${tone}`}>
+        <Icon className="icon" />
+      </span>
+      <span className="toast-text">{toast.message}</span>
       {toast.action && (
         <button
+          className="toast-act"
           onClick={() => {
             toast.action!.run();
             onDismiss(toast.id);
           }}
-          className="text-sm font-bold text-gold hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl cursor-pointer transition-colors"
         >
           {toast.action.label}
         </button>
       )}
-      <button onClick={() => onDismiss(toast.id)} className="p-1 text-white/60 hover:text-white rounded-full cursor-pointer" aria-label="סגור">
-        <X className="w-4 h-4" />
+      <button className="toast-x" onClick={() => onDismiss(toast.id)} aria-label="סגירה">
+        <X className="icon" />
       </button>
       {/* time-left bar */}
-      <i
-        className="absolute bottom-0 inset-x-0 h-[3px] bg-gold/70 origin-right"
-        style={{ animation: `shrink ${toast.duration}ms linear forwards` }}
-      />
+      <i className="ice-toast-bar" style={{ animation: `shrink ${toast.duration}ms linear forwards` }} />
     </div>
   );
 }
 
 export function ToastViewport({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   return (
-    <div className="fixed z-[70] bottom-4 left-1/2 -translate-x-1/2 md:left-6 md:translate-x-0 flex flex-col gap-2 items-center md:items-start pointer-events-none">
+    <div className="toasts" aria-live="polite">
       {toasts.map((t) => (
-        <div key={t.id} className="pointer-events-auto">
-          <ToastCard toast={t} onDismiss={onDismiss} />
-        </div>
+        <div key={t.id} className="contents"><ToastCard toast={t} onDismiss={onDismiss} /></div>
       ))}
     </div>
   );
