@@ -18,11 +18,11 @@ import BrandLogo from './components/BrandLogo';
 import OrbitDashboard from './orbit/Dashboard';
 import OIcon from './orbit/Icon';
 import { PageHead, Select as OSelect } from './orbit/kit';
-import ExpensesPage from './pages/ExpensesPage';
-import DebtsPage from './pages/DebtsPage';
-import IncomeView from './components/IncomeView';
-import DeliveriesView from './components/DeliveriesView';
-import EmployeesView from './components/EmployeesView';
+import OExpenses from './orbit/pages/Expenses';
+import ODebts from './orbit/pages/Debts';
+import OIncome from './orbit/pages/Income';
+import ODeliveries from './orbit/pages/Deliveries';
+import OEmployees from './orbit/pages/Employees';
 import CommandPalette, { PaletteItem } from './components/CommandPalette';
 import { useToasts, ToastViewport } from './components/Toasts';
 
@@ -660,6 +660,16 @@ export default function App() {
     pill.style.transform = `translateY(${item.offsetTop}px)`;
     pill.style.height = `${item.offsetHeight}px`;
   }, [activePage, sideCollapsed, currentUser, authChecking, isLoadingMonths]);
+  // What every inner page needs to know about the open month (header month picker + toasts)
+  const pageMonth = {
+    activeMonthId,
+    monthYear: activeMonthObject?.year,
+    monthNumber: activeMonthObject?.month_number,
+    months,
+    onChangeMonth: setActiveMonthId,
+    onAddMonth: () => setIsAddingMonthModal(true),
+    notify: pushToast
+  };
   const monthOptions = [...months]
     .sort((a, b) => b.year - a.year || b.month_number - a.month_number)
     .map((m) => ({ id: m.id, label: m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}` }));
@@ -824,21 +834,6 @@ export default function App() {
             </div>
           </div>
 
-          {activePage !== 'dashboard' && (
-            <div key={activePage}><PageHead title={currentNav.label} sub={currentNav.desc}>
-              <button type="button" className="btn btn--ghost ice-hide-sm" onClick={() => setPaletteOpen(true)}>
-                <OIcon name="search" /> חיפוש <kbd className="ice-kbd" dir="ltr">Ctrl K</kbd>
-              </button>
-              <OSelect value={activeMonthId} options={monthOptions} onChange={setActiveMonthId} icon="calendar" label="חודש" align="end" />
-              <button type="button" className="icon-btn icon-btn--soft" onClick={() => setIsAddingMonthModal(true)} aria-label="הוספת חודש חדש" title="הוספת חודש חדש" id="trigger-add-month-modal">
-                <OIcon name="plus" />
-              </button>
-              <button type="button" className="btn btn--primary" onClick={handleExportMonth} disabled={isExporting || !activeMonthId} id="export-month-excel">
-                <OIcon name="download" /> {isExporting ? 'מייצא...' : 'ייצוא לאקסל'}
-              </button>
-            </PageHead></div>
-          )}
-
           {/* Page — re-keyed so each page / month change plays the entrance */}
           <main key={`${activePage}-${activeMonthId}`} className="main ice-main">
             {isLoadingData ? (
@@ -870,72 +865,48 @@ export default function App() {
                   />
                 )}
 
-              {activePage === 'fixed_expenses' && (
-                <ExpensesPage
-                  kind="fixed"
-                  expenses={fixedExpenses}
-                  activeMonthId={activeMonthId}
-                  onSaveExpense={handleSaveFixedExpense}
-                  onDeleteExpense={handleDeleteFixedExpense}
-                  notify={pushToast}
-                />
-              )}
+                {activePage === 'fixed_expenses' && (
+                  <OExpenses
+                    kind="fixed"
+                    expenses={fixedExpenses}
+                    {...pageMonth}
+                    onSaveExpense={handleSaveFixedExpense}
+                    onDeleteExpense={handleDeleteFixedExpense}
+                  />
+                )}
 
-              {activePage === 'variable_expenses' && (
-                <ExpensesPage
-                  kind="variable"
-                  expenses={variableExpenses}
-                  activeMonthId={activeMonthId}
-                  monthYear={activeMonthObject?.year}
-                  monthNumber={activeMonthObject?.month_number}
-                  onSaveExpense={handleSaveVariableExpense}
-                  onDeleteExpense={handleDeleteVariableExpense}
-                  notify={pushToast}
-                />
-              )}
+                {activePage === 'variable_expenses' && (
+                  <OExpenses
+                    kind="variable"
+                    expenses={variableExpenses}
+                    {...pageMonth}
+                    onSaveExpense={handleSaveVariableExpense}
+                    onDeleteExpense={handleDeleteVariableExpense}
+                  />
+                )}
 
-              {activePage === 'debts' && (
-                <DebtsPage
-                  debts={debts}
-                  activeMonthId={activeMonthId}
-                  monthYear={activeMonthObject?.year}
-                  monthNumber={activeMonthObject?.month_number}
-                  onSaveDebt={handleSaveDebt}
-                  onDeleteDebt={handleDeleteDebt}
-                  notify={pushToast}
-                />
-              )}
+                {activePage === 'debts' && <ODebts debts={debts} {...pageMonth} onSaveDebt={handleSaveDebt} onDeleteDebt={handleDeleteDebt} />}
 
-              {activePage === 'income' && (
-                <IncomeView 
-                  incomeEntries={incomeEntries}
-                  activeMonthId={activeMonthId}
-                  onSaveIncome={handleSaveIncomeEntry}
-                  onDeleteIncome={handleDeleteIncomeEntry}
-                />
-              )}
+                {activePage === 'income' && (
+                  <OIncome incomeEntries={incomeEntries} {...pageMonth} onSaveIncome={handleSaveIncomeEntry} onDeleteIncome={handleDeleteIncomeEntry} />
+                )}
 
-              {activePage === 'deliveries' && (
-                <DeliveriesView 
-                  deliveries={deliveries}
-                  activeMonthId={activeMonthId}
-                  onSaveDelivery={handleSaveDelivery}
-                  onDeleteDelivery={handleDeleteDelivery}
-                />
-              )}
+                {activePage === 'deliveries' && (
+                  <ODeliveries deliveries={deliveries} {...pageMonth} onSaveDelivery={handleSaveDelivery} onDeleteDelivery={handleDeleteDelivery} />
+                )}
 
-              {activePage === 'employees' && (
-                <EmployeesView
-                  employees={employees}
-                  employeeMonths={employeeMonths}
-                  activeMonthId={activeMonthId}
-                  onSaveEmployee={handleSaveEmployee}
-                  onDeleteEmployee={handleDeleteEmployee}
-                  onSaveEmployeeMonth={handleSaveEmployeeMonth}
-                />
-              )}
-            </>
-          )}
+                {activePage === 'employees' && (
+                  <OEmployees
+                    employees={employees}
+                    employeeMonths={employeeMonths}
+                    {...pageMonth}
+                    onSaveEmployee={handleSaveEmployee}
+                    onDeleteEmployee={handleDeleteEmployee}
+                    onSaveEmployeeMonth={handleSaveEmployeeMonth}
+                  />
+                )}
+              </>
+            )}
           </main>
         </div>
       </div>
