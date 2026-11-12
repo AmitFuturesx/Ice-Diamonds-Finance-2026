@@ -88,38 +88,38 @@ export default function DeliveriesView({
     <div className="space-y-6">
       
       {/* VAT Summary Header panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 bg-white shadow-card rounded-[1.6rem] overflow-hidden ">
         <div className="p-6 space-y-1">
-          <h2 className="text-xl font-bold text-white">ריכוז שליחויות והפצה</h2>
-          <p className="text-xs text-zinc-500">
+          <h2 className="text-xl font-bold text-ink">ריכוז שליחויות והפצה</h2>
+          <p className="text-xs text-slate-500">
             מעקב אחר משולחי חבילות מבוטחות ללקוחות קצה, ספקים וסדנאות יציקה
           </p>
-          <div className="pt-2 text-xs text-amber-500 font-semibold flex items-center gap-1.5 font-sans">
-            <Scale className="w-4.5 h-4.5 text-[#22c55e]" />
+          <div className="pt-2 text-xs text-amber-700 font-semibold flex items-center gap-1.5 font-sans">
+            <Scale className="w-4.5 h-4.5 text-emerald-600" />
             <span>הערה: המחירים רשומים ללא מע״מ כחוק. מע״מ נוכחי: 17%</span>
           </div>
         </div>
 
-        <div className="p-6 bg-zinc-900/30 border-t md:border-t-0 md:border-r border-zinc-800 text-center flex flex-col justify-center">
-          <span className="text-xs text-zinc-500 block">סה״כ שליחויות נטו (ללא מע״מ)</span>
-          <span className="text-2xl font-black font-mono text-zinc-350 mt-1">
+        <div className="p-6 bg-slate-50 border-t md:border-t-0 md:border-r border-line text-center flex flex-col justify-center">
+          <span className="text-xs text-slate-500 block">סה״כ שליחויות נטו (ללא מע״מ)</span>
+          <span className="text-2xl font-black font-mono text-slate-500 mt-1">
             {runningTotalNet.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
           </span>
         </div>
 
-        <div className="p-6 bg-zinc-900/50 border-t md:border-t-0 md:border-r border-zinc-800 text-center flex flex-col justify-center">
-          <span className="text-xs text-zinc-500 block">סה״כ לתשלום כולל מע״מ (17%)</span>
-          <span className="text-2xl font-black font-mono text-[#22c55e] mt-1">
+        <div className="p-6 bg-slate-50 border-t md:border-t-0 md:border-r border-line text-center flex flex-col justify-center">
+          <span className="text-xs text-slate-500 block">סה״כ לתשלום כולל מע״מ (17%)</span>
+          <span className="text-2xl font-black font-mono text-emerald-600 mt-1">
             {runningTotalGross.toLocaleString('he-IL', { style: 'currency', currency: 'ILS' })}
           </span>
         </div>
       </div>
 
       {/* Deliveries Table */}
-      <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-white shadow-card rounded-[1.6rem] overflow-hidden ">
         <table className="w-full text-right border-collapse">
           <thead>
-            <tr className="border-b border-zinc-800 text-xs text-zinc-400 bg-zinc-900/10">
+            <tr className="border-b border-line text-xs text-slate-500 bg-slate-50/60">
               <th className="p-4 font-semibold w-1/6">תאריך</th>
               <th className="p-4 font-semibold w-1/3">מסלול (מוצא ← יעד)</th>
               <th className="p-4 font-semibold w-1/6">מחיר נטו (₪)</th>
@@ -127,10 +127,10 @@ export default function DeliveriesView({
               <th className="p-4 font-bold text-center w-[15%]">פעולות</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
+          <tbody className="divide-y divide-line text-sm text-ink-2">
             {deliveries.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-zinc-600">
+                <td colSpan={5} className="p-8 text-center text-slate-400">
                   אין שליחויות רשומות לחודש הנבחר.
                 </td>
               </tr>
@@ -141,19 +141,19 @@ export default function DeliveriesView({
                 return (
                   <tr 
                     key={item.id} 
-                    className={`hover:bg-zinc-900/35 transition-colors duration-200 ${
-                      isEditing ? 'bg-zinc-900/60' : ''
+                    className={`hover:bg-slate-50 transition-colors duration-200 ${
+                      isEditing ? 'bg-slate-50' : ''
                     }`}
                   >
                     {/* Date */}
-                    <td className="p-4 font-mono text-zinc-400">
+                    <td className="p-4 font-mono text-slate-500">
                       {isEditing ? (
                         <input
                           id={`edit-del-date-${item.id}`}
                           type="date"
                           value={editDate}
                           onChange={(e) => setEditDate(e.target.value)}
-                          className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-white outline-none font-mono focus:border-green-500"
+                          className="bg-white border border-line rounded px-2 py-1 text-xs text-ink outline-none font-mono focus:border-navy"
                         />
                       ) : (
                         <span>{item.date}</span>
@@ -170,37 +170,37 @@ export default function DeliveriesView({
                             value={editRouteFrom}
                             onChange={(e) => setEditRouteFrom(e.target.value)}
                             placeholder="מוצא"
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-white max-w-[120px] outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2 py-1 text-xs text-ink max-w-[120px] outline-none focus:border-navy"
                           />
-                          <span className="text-zinc-500">←</span>
+                          <span className="text-slate-500">←</span>
                           <input
                             id={`edit-del-to-${item.id}`}
                             type="text"
                             value={editRouteTo}
                             onChange={(e) => setEditRouteTo(e.target.value)}
                             placeholder="יעד"
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-white max-w-[120px] outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2 py-1 text-xs text-ink max-w-[120px] outline-none focus:border-navy"
                           />
                         </div>
                       ) : (
-                        <span className="font-semibold text-white flex items-center gap-2">
-                          <Truck className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                        <span className="font-semibold text-ink flex items-center gap-2">
+                          <Truck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span>{item.route_from}</span>
-                          <span className="text-zinc-600">←</span>
+                          <span className="text-slate-400">←</span>
                           <span>{item.route_to}</span>
                         </span>
                       )}
                     </td>
 
                     {/* Price */}
-                    <td className="p-4 font-mono text-xs font-semibold text-zinc-200">
+                    <td className="p-4 font-mono text-xs font-semibold text-ink">
                       {isEditing ? (
                         <input
                           id={`edit-del-price-${item.id}`}
                           type="number"
                           value={editPrice}
                           onChange={(e) => setEditPrice(e.target.value)}
-                          className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24 outline-none font-mono focus:border-green-500"
+                          className="bg-white border border-line rounded px-2 py-1 text-sm text-ink w-24 outline-none font-mono focus:border-navy"
                         />
                       ) : (
                         <span>{Number(item.price).toLocaleString()} ₪</span>
@@ -208,7 +208,7 @@ export default function DeliveriesView({
                     </td>
 
                     {/* Notes */}
-                    <td className="p-4 text-zinc-400">
+                    <td className="p-4 text-slate-500">
                       {isEditing ? (
                         <input
                           id={`edit-del-notes-${item.id}`}
@@ -216,7 +216,7 @@ export default function DeliveriesView({
                           value={editNotes}
                           onChange={(e) => setEditNotes(e.target.value)}
                           placeholder="הערות..."
-                          className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-white w-full outline-none focus:border-green-500"
+                          className="bg-white border border-line rounded px-2 py-1 text-xs text-ink w-full outline-none focus:border-navy"
                         />
                       ) : (
                         <span>{item.notes || '—'}</span>
@@ -231,14 +231,14 @@ export default function DeliveriesView({
                             <button
                               id={`save-del-${item.id}`}
                               onClick={() => handleSaveEdit(item.id)}
-                              className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
+                              className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors"
                             >
                               <Check className="w-4 h-4" />
                             </button>
                             <button
                               id={`cancel-del-${item.id}`}
                               onClick={cancelEdit}
-                              className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                              className="p-1.5 hover:bg-slate-100 text-slate-500 rounded transition-colors"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -248,14 +248,14 @@ export default function DeliveriesView({
                             <button
                               id={`edit-del-${item.id}`}
                               onClick={() => startEdit(item)}
-                              className="p-1.5 hover:bg-zinc-800 hover:text-[#22c55e] text-zinc-500 rounded transition-colors"
+                              className="p-1.5 hover:bg-slate-100 hover:text-navy text-slate-500 rounded transition-colors"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               id={`delete-del-${item.id}`}
                               onClick={() => onDeleteDelivery(item.id)}
-                              className="p-1.5 hover:bg-red-950/40 hover:text-red-400 text-zinc-500 rounded transition-colors"
+                              className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded transition-colors"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -272,27 +272,27 @@ export default function DeliveriesView({
       </div>
 
       {/* Add New Delivery Form Box */}
-      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
-        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <Plus className="w-5 h-5 text-[#22c55e]" />
+      <div className="bg-white shadow-card p-6 rounded-[1.6rem]">
+        <h3 className="text-base font-bold text-ink mb-4 flex items-center gap-2">
+          <Plus className="w-5 h-5 text-emerald-600" />
           רישום שליחות חדשה
         </h3>
 
         <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">תאריך המשלוח *</label>
+            <label className="text-xs text-slate-500 font-medium">תאריך המשלוח *</label>
             <input
               id="new-del-date"
               type="date"
               required
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink font-mono focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">עיר מוצא *</label>
+            <label className="text-xs text-slate-500 font-medium">עיר מוצא *</label>
             <input
               id="new-del-from"
               type="text"
@@ -300,12 +300,12 @@ export default function DeliveriesView({
               value={newRouteFrom}
               onChange={(e) => setNewRouteFrom(e.target.value)}
               placeholder="לדוג׳ רמת גן"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">עיר יעד *</label>
+            <label className="text-xs text-slate-500 font-medium">עיר יעד *</label>
             <input
               id="new-del-to"
               type="text"
@@ -313,12 +313,12 @@ export default function DeliveriesView({
               value={newRouteTo}
               onChange={(e) => setNewRouteTo(e.target.value)}
               placeholder="לדוג׳ תל אביב, ירושלים"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium font-sans">מחיר נטו ללא מע״מ (₪) *</label>
+            <label className="text-xs text-slate-500 font-medium font-sans">מחיר נטו ללא מע״מ (₪) *</label>
             <input
               id="new-del-price"
               type="number"
@@ -326,27 +326,27 @@ export default function DeliveriesView({
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
               placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink font-mono focus:border-navy"
             />
           </div>
 
           <div className="flex gap-2">
             <div className="space-y-1 flex-1">
-              <label className="text-xs text-zinc-400 font-medium">הערות מיוחדות</label>
+              <label className="text-xs text-slate-500 font-medium">הערות מיוחדות</label>
               <input
                 id="new-del-notes"
                 type="text"
                 value={newNotes}
                 onChange={(e) => setNewNotes(e.target.value)}
                 placeholder="לדוג׳ שביר, מבוטח..."
-                className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+                className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
               />
             </div>
             
             <button
               id="add-del-btn"
               type="submit"
-              className="bg-green-500 hover:bg-green-600 text-black font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-green-500/10"
+              className="bg-navy hover:bg-navy-2 text-white font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-navy/15"
               title="רשום שליחות"
             >
               <Plus className="w-5 h-5" />

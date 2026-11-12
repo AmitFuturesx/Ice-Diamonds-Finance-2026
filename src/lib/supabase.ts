@@ -203,6 +203,40 @@ export const dbService = {
     }
   },
 
+  /**
+   * Per-month totals for a set of months (charts, sparklines, month-over-month deltas).
+   * One query per table; payroll is not included (matches the rest of the app's totals).
+   */
+  async getMonthTotals(monthIds: string[]): Promise<Record<string, { income: number; fixed: number; variable: number; debts: number }>> {
+    const out: Record<string, { income: number; fixed: number; variable: number; debts: number }> = {};
+    monthIds.forEach((id) => (out[id] = { income: 0, fixed: 0, variable: 0, debts: 0 }));
+    if (!monthIds.length) return out;
+    const add = (rows: any[], key: 'income' | 'fixed' | 'variable' | 'debts', field: string) =>
+      rows.forEach((r) => {
+        if (out[r.month_id]) out[r.month_id][key] += Number(r[field]) || 0;
+      });
+    if (isLiveSupabase && supabaseClient) {
+      const q = (table: string, cols: string) => supabaseClient!.from(table).select(cols).in('month_id', monthIds);
+      const [inc, fx, vr, db] = await Promise.all([
+        q('income_entries', 'month_id,amount'),
+        q('fixed_expenses', 'month_id,amount'),
+        q('variable_expenses', 'month_id,amount'),
+        q('debts', 'month_id,monthly_payment')
+      ]);
+      for (const r of [inc, fx, vr, db]) if (r.error) throw r.error;
+      add((inc.data as any[]) || [], 'income', 'amount');
+      add((fx.data as any[]) || [], 'fixed', 'amount');
+      add((vr.data as any[]) || [], 'variable', 'amount');
+      add((db.data as any[]) || [], 'debts', 'monthly_payment');
+    } else {
+      add(getFromStorage<any>('income'), 'income', 'amount');
+      add(getFromStorage<any>('fixed_expenses'), 'fixed', 'amount');
+      add(getFromStorage<any>('variable_expenses'), 'variable', 'amount');
+      add(getFromStorage<any>('debts'), 'debts', 'monthly_payment');
+    }
+    return out;
+  },
+
   // Fixed Expenses
   async getFixedExpenses(monthId: string): Promise<FixedExpense[]> {
     if (isLiveSupabase && supabaseClient) {

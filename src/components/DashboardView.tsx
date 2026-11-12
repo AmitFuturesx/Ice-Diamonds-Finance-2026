@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FixedExpense,
   VariableExpense,
@@ -8,23 +8,52 @@ import {
   PaymentStatus,
   Employee,
   EmployeeMonth,
-  Department
+  Department,
+  Month
 } from '../types';
 import { computePay } from '../lib/payroll';
+import { dbService } from '../lib/supabase';
+import { ils, pctChange, useCountUp } from '../lib/hooks';
+import {
+  Card,
+  CardHead,
+  Kpi,
+  Segmented,
+  StatusPill,
+  MoodChip,
+  Drawer,
+  Donut,
+  Ring,
+  BarChart,
+  Progress,
+  Empty,
+  Button,
+  TONES,
+  nextStatus,
+  nextMood
+} from '../ui/kit';
 import {
   TrendingUp,
   TrendingDown,
-  CreditCard,
+  Wallet,
+  Hourglass,
+  BarChart3,
   CalendarDays,
-  Calculator,
-  Truck,
-  Activity,
-  User,
+  Check,
+  Flame,
+  PieChart,
+  Coins,
+  Users,
+  Landmark,
   ArrowUpLeft,
   ArrowDownLeft,
-  Coins,
-  X
+  ChevronLeft
 } from 'lucide-react';
+
+type Notify = (
+  message: string,
+  opts?: { tone?: 'success' | 'error' | 'info'; duration?: number; action?: { label: string; run: () => void } }
+) => void;
 
 interface DashboardViewProps {
   fixedExpenses: FixedExpense[];
@@ -33,81 +62,78 @@ interface DashboardViewProps {
   incomeEntries: IncomeEntry[];
   deliveries: Delivery[];
   selectedMonthName: string;
+  months?: Month[];
+  activeMonthId?: string;
   onSaveFixedExpense?: (e: Omit<FixedExpense, 'id'> & { id?: string }) => Promise<void>;
   onSaveVariableExpense?: (e: Omit<VariableExpense, 'id'> & { id?: string }) => Promise<void>;
   onSaveDebt?: (d: Omit<Debt, 'id'> & { id?: string }) => Promise<void>;
   employees?: Employee[];
   employeeMonths?: EmployeeMonth[];
   onOpenEmployees?: () => void;
+  onNavigate?: (page: 'debts' | 'income' | 'fixed_expenses' | 'variable_expenses') => void;
+  notify?: Notify;
 }
+
+const SHORT_MONTH = ['', 'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+const INCOME_SOURCES = ['מקסימוס', 'UPS', 'מזומן', 'העברה בנקאית', 'משולם / GROW'] as const;
+const DEPT_LABEL: Record<Department, string> = { freelancer: 'פרילנסרים', sales: 'אנשי מכירות', staff: 'עובדים נוספים' };
+const MOOD_RANK: Record<string, number> = { angry: 0, neutral: 1, happy: 2 };
+const DAY_ORDER: Record<string, number> = { '10': 0, '15': 1, '19': 2, unknown: 3 };
+
+type Obligation = {
+  id: string;
+  name: string;
+  amount: number;
+  status: PaymentStatus;
+  dayKey: string;
+  source: 'fixed' | 'variable' | 'debt';
+  mood: string;
+  item: FixedExpense | VariableExpense | Debt;
+};
+
+type Totals = { income: number; fixed: number; variable: number; debts: number };
 
 export default function DashboardView({
   fixedExpenses,
   variableExpenses,
   debts,
   incomeEntries,
-  deliveries,
   selectedMonthName,
+  months = [],
+  activeMonthId = '',
   onSaveFixedExpense,
   onSaveVariableExpense,
   onSaveDebt,
   employees = [],
   employeeMonths = [],
-  onOpenEmployees
+  onOpenEmployees,
+  onNavigate,
+  notify
 }: DashboardViewProps) {
-  // Which billing-day popup is open (null = closed)
+  // Drawers: one billing day, or a whole-month list (all / remaining / paid)
   const [openDay, setOpenDay] = useState<string | null>(null);
-  // Which whole-month summary popup is open (all / remaining / paid)
   const [openSummary, setOpenSummary] = useState<'all' | 'remaining' | 'paid' | null>(null);
+  const [range, setRange] = useState<'3' | '6' | '12'>('6');
 
-  // Calculations
-  const totalIncome = incomeEntries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  
-  const totalFixed = fixedExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalVariable = variableExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalDebts = debts.reduce((acc, curr) => acc + (Number(curr.monthly_payment) || 0), 0);
-  
+  /* ---------------- this month ---------------- */
+  const totalIncome = incomeEntries.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const totalFixed = fixedExpenses.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const totalVariable = variableExpenses.reduce((a, c) => a + (Number(c.amount) || 0), 0);
+  const totalDebts = debts.reduce((a, c) => a + (Number(c.monthly_payment) || 0), 0);
   const totalExpenses = totalFixed + totalVariable + totalDebts;
   const netBalance = totalIncome - totalExpenses;
-  const isPositive = netBalance >= 0;
 
-  // Payment status across all obligations (fixed + variable use `amount`, debts use `monthly_payment`)
-  const debtStatusOf = (d: Debt) => d.status || 'לא שולם';
-  const paidThisMonth =
-    fixedExpenses.filter(e => e.status === 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
-    variableExpenses.filter(e => e.status === 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
-    debts.filter(d => debtStatusOf(d) === 'שולם').reduce((a, c) => a + (Number(c.monthly_payment) || 0), 0);
-  const remainingThisMonth =
-    fixedExpenses.filter(e => e.status !== 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
-    variableExpenses.filter(e => e.status !== 'שולם').reduce((a, c) => a + (Number(c.amount) || 0), 0) +
-    debts.filter(d => debtStatusOf(d) !== 'שולם').reduce((a, c) => a + (Number(c.monthly_payment) || 0), 0);
-  const totalObligations = paidThisMonth + remainingThisMonth;
-  const paidPercent = totalObligations > 0 ? (paidThisMonth / totalObligations) * 100 : 0;
-
-  // Amount to pay per billing day (10 / 15 / 19 / unknown), combining fixed + variable
-  const BILLING_DAYS_DASH = [10, 15, 19];
-  const bucketKeyDash = (dayNum: number) =>
-    (dayNum == null || isNaN(dayNum))
-      ? 'unknown'
-      : String(BILLING_DAYS_DASH.reduce((p, c) => (Math.abs(c - dayNum) < Math.abs(p - dayNum) ? c : p)));
-  // Per-vendor obligations (fixed + variable + debts) tagged with billing day + source
-  type Obligation = {
-    id: string;
-    name: string;
-    amount: number;
-    status: string;
-    dayKey: string;
-    source: 'fixed' | 'variable' | 'debt';
-    mood: string;
-    item: FixedExpense | VariableExpense | Debt;
-  };
+  // Every payment of the month (fixed + variable + debt installments), tagged with its billing day
+  const BILLING_DAYS = [10, 15, 19];
+  const bucketKey = (n: number) =>
+    n == null || isNaN(n) ? 'unknown' : String(BILLING_DAYS.reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p)));
   const obligations: Obligation[] = [
     ...fixedExpenses.map((e): Obligation => ({
       id: e.id,
       name: e.name,
       amount: Number(e.amount) || 0,
       status: e.status,
-      dayKey: bucketKeyDash(e.payment_date ? parseInt(e.payment_date, 10) : NaN),
+      dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN),
       source: 'fixed',
       mood: e.mood || 'happy',
       item: e
@@ -117,7 +143,7 @@ export default function DashboardView({
       name: e.name,
       amount: Number(e.amount) || 0,
       status: e.status,
-      dayKey: bucketKeyDash(e.date ? parseInt(e.date.split('-')[2], 10) : NaN),
+      dayKey: bucketKey(e.date ? parseInt(e.date.split('-')[2], 10) : NaN),
       source: 'variable',
       mood: e.mood || 'happy',
       item: e
@@ -127,84 +153,85 @@ export default function DashboardView({
       name: d.name,
       amount: Number(d.monthly_payment) || 0,
       status: d.status || 'לא שולם',
-      dayKey: bucketKeyDash(d.payment_date ? parseInt(d.payment_date, 10) : NaN),
+      dayKey: bucketKey(d.payment_date ? parseInt(d.payment_date, 10) : NaN),
       source: 'debt',
       mood: d.mood || 'happy',
       item: d
     }))
   ];
+  const paid = obligations.filter((o) => o.status === 'שולם').reduce((a, o) => a + o.amount, 0);
+  const remaining = obligations.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0);
+  const paidPct = paid + remaining > 0 ? (paid / (paid + remaining)) * 100 : 0;
 
-  const dayBuckets: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
-  const dayRemaining: Record<string, number> = { '10': 0, '15': 0, '19': 0, unknown: 0 };
-  obligations.forEach((o) => {
-    dayBuckets[o.dayKey] += o.amount;
-    if (o.status !== 'שולם') dayRemaining[o.dayKey] += o.amount;
+  const days = ['10', '15', '19', 'unknown'].map((k) => {
+    const items = obligations.filter((o) => o.dayKey === k);
+    const total = items.reduce((a, o) => a + o.amount, 0);
+    const left = items.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0);
+    return { key: k, items, total, left, count: items.length, openCount: items.filter((o) => o.status !== 'שולם').length };
   });
-  const billingDayCards = [
-    { key: '10', label: '10 לחודש', amount: dayBuckets['10'], remaining: dayRemaining['10'] },
-    { key: '15', label: '15 לחודש', amount: dayBuckets['15'], remaining: dayRemaining['15'] },
-    { key: '19', label: '19 לחודש', amount: dayBuckets['19'], remaining: dayRemaining['19'] },
-    { key: 'unknown', label: 'לא ידוע מתי', amount: dayBuckets['unknown'], remaining: dayRemaining['unknown'] }
-  ];
 
-  // Whole-month totals for the payment schedule (fixed + variable)
-  const totalDayPay = billingDayCards.reduce((a, c) => a + c.amount, 0);
-  const totalDayRemaining = billingDayCards.reduce((a, c) => a + c.remaining, 0);
-  const totalDayPaid = totalDayPay - totalDayRemaining;
-
-  // Mood config (patience level of the vendor waiting to be paid)
-  const MOODS: Record<string, { emoji: string; label: string; cls: string }> = {
-    happy: { emoji: '😊', label: 'רגוע', cls: 'bg-green-950/40 text-green-400 border-green-500/30' },
-    neutral: { emoji: '😐', label: 'העיר על זה', cls: 'bg-amber-950/40 text-amber-400 border-amber-500/30' },
-    angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-red-950/40 text-red-400 border-red-500/30' }
-  };
-  const nextMood = (m: string) => (m === 'happy' ? 'neutral' : m === 'neutral' ? 'angry' : 'happy');
-  // Save a patch (mood / status) back to whichever table the obligation lives in
+  // Save a patch back to whichever table the payment lives in
   const saveObligation = (o: Obligation, patch: { mood?: string; status?: PaymentStatus }) => {
-    if (o.source === 'fixed' && onSaveFixedExpense) onSaveFixedExpense({ ...(o.item as FixedExpense), ...patch });
-    if (o.source === 'variable' && onSaveVariableExpense) onSaveVariableExpense({ ...(o.item as VariableExpense), ...patch });
-    if (o.source === 'debt' && onSaveDebt) onSaveDebt({ ...(o.item as Debt), ...patch });
+    if (o.source === 'fixed') onSaveFixedExpense?.({ ...(o.item as FixedExpense), ...patch });
+    if (o.source === 'variable') onSaveVariableExpense?.({ ...(o.item as VariableExpense), ...patch });
+    if (o.source === 'debt') onSaveDebt?.({ ...(o.item as Debt), ...patch });
   };
-  const cycleMood = (o: Obligation) => saveObligation(o, { mood: nextMood(o.mood) });
+  const markPaid = (o: Obligation) => {
+    const prev = o.status;
+    saveObligation(o, { status: 'שולם' });
+    notify?.(`סומן כשולם: ${o.name}`, { tone: 'success', duration: 7000, action: { label: 'בטל', run: () => saveObligation(o, { status: prev }) } });
+  };
+  const sourceLabel = (s: Obligation['source']) => (s === 'fixed' ? 'הוצאה קבועה' : s === 'variable' ? 'הוצאה משתנה' : 'החזר חוב');
+  const dayLabel = (k: string) => (k === 'unknown' ? 'תאריך לא ידוע' : `${k} לחודש`);
 
-  // Payment status cycle: לא שולם -> שולם חלקית -> שולם -> לא שולם
-  const nextStatus = (s: string): PaymentStatus =>
-    s === 'לא שולם' ? 'שולם חלקית' : s === 'שולם חלקית' ? 'שולם' : 'לא שולם';
-  const cycleStatus = (o: Obligation) => saveObligation(o, { status: nextStatus(o.status) });
-  const sourceLabel = (s: Obligation['source']) =>
-    s === 'fixed' ? 'הוצאה קבועה' : s === 'variable' ? 'הוצאה משתנה' : 'חוב / הלוואה';
-
-  // All items of the open day — unpaid first; paid ones stay visible (dimmed)
-  // so a status click can be undone right there.
-  const openDayItems = openDay
-    ? obligations
-        .filter((o) => o.dayKey === openDay)
-        .sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם'))
-    : [];
-  const openDayLabel = billingDayCards.find((c) => c.key === openDay)?.label || '';
-  const openDayRemaining = openDayItems
+  // "Pay next": unpaid, the angriest vendor first, then by billing day, then the bigger amount
+  const payNext = obligations
     .filter((o) => o.status !== 'שולם')
-    .reduce((a, o) => a + o.amount, 0);
+    .sort(
+      (a, b) =>
+        (MOOD_RANK[a.mood] ?? 2) - (MOOD_RANK[b.mood] ?? 2) || DAY_ORDER[a.dayKey] - DAY_ORDER[b.dayKey] || b.amount - a.amount
+    );
 
-  // Day label for an obligation (for the summary popup context)
-  const dayLabelOf = (k: string) => (k === 'unknown' ? 'לא ידוע' : `${k} לחודש`);
-  const statusBadgeCls = (s: string) =>
-    s === 'שולם'
-      ? 'bg-green-950/40 text-green-400 border-green-500/30'
-      : s === 'שולם חלקית'
-      ? 'bg-amber-950/40 text-amber-400 border-amber-500/30'
-      : 'bg-red-950/40 text-red-400 border-red-500/30';
+  /* ---------------- history (charts, sparklines, deltas) ---------------- */
+  const sorted = useMemo(
+    () => [...months].sort((a, b) => a.year - b.year || a.month_number - b.month_number),
+    [months]
+  );
+  const activeIdx = sorted.findIndex((m) => m.id === activeMonthId);
+  const window12 = useMemo(
+    () => (activeIdx >= 0 ? sorted.slice(Math.max(0, activeIdx - 11), activeIdx + 1) : []),
+    [sorted, activeIdx]
+  );
+  const idsKey = window12.map((m) => m.id).join(',');
+  const [hist, setHist] = useState<Record<string, Totals>>({});
+  useEffect(() => {
+    if (!idsKey) return;
+    let alive = true;
+    dbService
+      .getMonthTotals(idsKey.split(','))
+      .then((r) => alive && setHist(r))
+      .catch(() => alive && setHist({}));
+    return () => {
+      alive = false;
+    };
+  }, [idsKey]);
 
-  // Whole-month summary popup contents
-  const summaryConfig = {
-    all: { title: 'כל התשלומים החודש', filter: (_o: Obligation) => true },
-    remaining: { title: 'נותר לשלם החודש', filter: (o: Obligation) => o.status !== 'שולם' },
-    paid: { title: 'כבר שולם החודש', filter: (o: Obligation) => o.status === 'שולם' }
-  } as const;
-  const summaryItems = openSummary ? obligations.filter(summaryConfig[openSummary].filter) : [];
-  const summaryTotal = summaryItems.reduce((a, o) => a + o.amount, 0);
+  // The open month always uses live numbers, so edits show up at once
+  const series = window12.map((m) => {
+    const t: Totals =
+      m.id === activeMonthId
+        ? { income: totalIncome, fixed: totalFixed, variable: totalVariable, debts: totalDebts }
+        : hist[m.id] || { income: 0, fixed: 0, variable: 0, debts: 0 };
+    const exp = t.fixed + t.variable + t.debts;
+    return { m, income: t.income, expenses: exp, net: t.income - exp };
+  });
+  const prev = series.length > 1 ? series[series.length - 2] : null;
+  const last6 = series.slice(-6);
+  const shown = series.slice(-Number(range));
+  const withData = series.filter((s) => s.income || s.expenses);
+  const avgNet = withData.length ? withData.reduce((a, s) => a + s.net, 0) / withData.length : 0;
 
-  // Payroll summary — same calculation as the employees screen
+  /* ---------------- payroll ---------------- */
   const empMonthById: Record<string, EmployeeMonth | undefined> = {};
   employeeMonths.forEach((m) => (empMonthById[m.employee_id] = m));
   const payrollRows = employees
@@ -216,672 +243,539 @@ export default function DashboardView({
     .sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם') || b.total - a.total);
   const payrollTotal = payrollRows.reduce((a, r) => a + r.total, 0);
   const payrollPaid = payrollRows.filter((r) => r.status === 'שולם').reduce((a, r) => a + r.total, 0);
-  const DEPT_LABEL: Record<Department, string> = { freelancer: 'פרילנסרים', sales: 'אנשי מכירות', staff: 'עובדים נוספים' };
-  const payrollByDept = (Object.keys(DEPT_LABEL) as Department[]).map((d) => ({
-    key: d,
-    label: DEPT_LABEL[d],
-    count: payrollRows.filter((r) => r.emp.department === d).length,
-    total: payrollRows.filter((r) => r.emp.department === d).reduce((a, r) => a + r.total, 0)
-  }));
+  const payrollPct = payrollTotal > 0 ? (payrollPaid / payrollTotal) * 100 : 0;
 
-  // Donut chart: where the money went this month (income + 3 expense types)
-  const pieRaw = [
-    { label: 'הכנסות', value: totalIncome, color: '#22c55e' },
-    { label: 'הוצאות קבועות', value: totalFixed, color: '#f59e0b' },
-    { label: 'הוצאות משתנות', value: totalVariable, color: '#a855f7' },
-    { label: 'חובות והלוואות', value: totalDebts, color: '#ef4444' }
+  /* ---------------- donut + income channels ---------------- */
+  const pie = [
+    { label: 'הכנסות', value: totalIncome, color: '#10b981' },
+    { label: 'הוצאות קבועות', value: totalFixed, color: '#d9b455' },
+    { label: 'הוצאות משתנות', value: totalVariable, color: '#24316e' },
+    { label: 'חובות והלוואות', value: totalDebts, color: '#f43f5e' }
   ];
-  const pieTotal = pieRaw.reduce((a, c) => a + c.value, 0);
-  const PIE_R = 70;
-  const PIE_C = 2 * Math.PI * PIE_R;
-  let pieAcc = 0;
-  const pieSegments = pieRaw.map((d) => {
-    const frac = pieTotal > 0 ? d.value / pieTotal : 0;
-    const seg = { ...d, frac, dash: frac * PIE_C, offset: pieAcc };
-    pieAcc += frac * PIE_C;
-    return seg;
-  });
+  const pieTotal = pie.reduce((a, c) => a + c.value, 0);
+  const channels = INCOME_SOURCES.map((src) => {
+    const sum = incomeEntries.filter((i) => i.source === src).reduce((a, c) => a + (Number(c.amount) || 0), 0);
+    return { src, sum, pct: totalIncome > 0 ? (sum / totalIncome) * 100 : 0 };
+  }).sort((a, b) => b.sum - a.sum);
 
-  // Percentage breakdown of expenses
-  const totalAllocated = totalFixed + totalVariable + totalDebts;
-  const fixedPercent = totalAllocated > 0 ? (totalFixed / totalAllocated) * 100 : 0;
-  const variablePercent = totalAllocated > 0 ? (totalVariable / totalAllocated) * 100 : 0;
-  const debtsPercent = totalAllocated > 0 ? (totalDebts / totalAllocated) * 100 : 0;
+  /* ---------------- debts ---------------- */
+  const debtRows = [...debts]
+    .map((d) => {
+      const bal = Number(d.current_balance) || 0;
+      const pay = Number(d.monthly_payment) || 0;
+      const left = pay > 0 ? Math.max(0, Math.ceil(bal / pay) - 1) : null;
+      const orig = Number(d.original_amount) || 0;
+      return { d, bal, pay, left, progress: orig > bal && orig > 0 ? ((orig - bal) / orig) * 100 : null };
+    })
+    .sort((a, b) => b.bal - a.bal);
+  const debtBalance = debtRows.reduce((a, r) => a + r.bal, 0);
 
-  // Expense-to-income efficiency indicator
-  const efficiencyRatio = totalIncome > 0 ? Math.min(Math.round((totalExpenses / totalIncome) * 100), 100) : 0;
+  /* ---------------- drawers ---------------- */
+  const summaryCfg = {
+    all: { title: 'כל התשלומים החודש', filter: (_o: Obligation) => true },
+    remaining: { title: 'נותר לשלם החודש', filter: (o: Obligation) => o.status !== 'שולם' },
+    paid: { title: 'כבר שולם החודש', filter: (o: Obligation) => o.status === 'שולם' }
+  } as const;
+  const drawerItems = openDay
+    ? obligations
+        .filter((o) => o.dayKey === openDay)
+        .sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם') || b.amount - a.amount)
+    : openSummary
+    ? obligations.filter(summaryCfg[openSummary].filter).sort((a, b) => DAY_ORDER[a.dayKey] - DAY_ORDER[b.dayKey] || b.amount - a.amount)
+    : [];
+  const drawerOpen = !!openDay || !!openSummary;
+  const drawerLeft = drawerItems.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0);
+  const drawerTotal = drawerItems.reduce((a, o) => a + o.amount, 0);
+  const closeDrawer = () => {
+    setOpenDay(null);
+    setOpenSummary(null);
+  };
+
+  const netAnimated = useCountUp(netBalance, 1100, 150);
+  const isPositive = netBalance >= 0;
+  const expenseRatio = totalIncome > 0 ? Math.min(Math.round((totalExpenses / totalIncome) * 100), 999) : 0;
 
   return (
-    <div className="space-y-6">
-      
-      {/* Overview Hero Bento Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Main Net Balance Radial/Card Accent */}
-        <div className="lg:col-span-2 bg-[#111] border border-white/10 rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-2xl">
-          <div className="absolute top-0 left-0 w-32 h-32 bg-green-500/5 rounded-full blur-[40px] pointer-events-none"></div>
-          
-          <div className="flex items-center justify-between z-10">
-            <div>
-              <span className="text-xs text-gray-400 font-medium block">יתרת רווח נקי לרואי חשבון</span>
-              <h2 className="text-2xl font-extrabold text-white mt-1">מאזן החודש: {selectedMonthName}</h2>
-            </div>
-            <div className={`p-3 rounded-xl border ${
-              isPositive 
-                ? 'bg-[#22c55e]/10 border-[#22c55e]/20 text-[#22c55e]' 
-                : 'bg-rose-500/10 border-rose-500/20 text-rose-450'
-            }`}>
-              <Activity className="w-6 h-6 animate-pulse" />
-            </div>
-          </div>
-
-          <div className="mt-8 z-10 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
-            <div>
-              <div className="text-xs text-gray-400 font-medium">מאזן סופי (הכנסות פחות הוצאות)</div>
-              <div className={`text-4xl sm:text-5xl font-black font-mono tracking-tight mt-1 ${
-                isPositive ? 'text-[#22c55e]' : 'text-rose-500'
-              }`}>
-                {isPositive ? '+' : ''}{netBalance.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+    <div className="space-y-4 sm:space-y-5">
+      {/* ============ KPI strip ============ */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5">
+        <Kpi
+          i={0}
+          icon={TrendingUp}
+          label="הכנסות החודש"
+          value={totalIncome}
+          tone="green"
+          spark={last6.map((s) => s.income)}
+          delta={prev ? pctChange(totalIncome, prev.income) : null}
+          onClick={onNavigate ? () => onNavigate('income') : undefined}
+        />
+        <Kpi
+          i={1}
+          icon={TrendingDown}
+          label="הוצאות החודש"
+          value={totalExpenses}
+          tone="red"
+          spark={last6.map((s) => s.expenses)}
+          delta={prev ? pctChange(totalExpenses, prev.expenses) : null}
+          goodWhenUp={false}
+          onClick={() => setOpenSummary('all')}
+        />
+        <Kpi
+          i={2}
+          icon={Wallet}
+          label="מאזן נטו"
+          value={netBalance}
+          tone="navy"
+          spark={last6.map((s) => s.net)}
+          delta={prev ? pctChange(netBalance, prev.net) : null}
+        />
+        <Kpi
+          i={3}
+          icon={Hourglass}
+          label="נותר לשלם"
+          value={remaining}
+          tone="amber"
+          onClick={() => setOpenSummary('remaining')}
+          foot={
+            <div className="space-y-1.5 pt-1">
+              <Progress value={paidPct} color={TONES.green} />
+              <div className="flex justify-between">
+                <span>{paidPct.toFixed(0)}% כבר שולם</span>
+                <span className="num">{ils(paid)}</span>
               </div>
             </div>
-
-            <div className="text-xs text-zinc-500">
-              {isPositive ? (
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/20 font-semibold tracking-wide">
-                  <ArrowUpLeft className="w-3.5 h-3.5" />
-                  עמידה ביעדי רווחיות החודש
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20 font-semibold tracking-wide">
-                  <ArrowDownLeft className="w-3.5 h-3.5" />
-                  גרעון תקציבי - נדרש אופטימיזציה
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Miniature efficiency progress bar */}
-          <div className="mt-6">
-            <div className="flex justify-between text-xs text-gray-400 mb-1.5 font-medium">
-              <span>יחס הוצאות מתוך הכנסה:</span>
-              <span className={efficiencyRatio > 80 ? 'text-rose-400' : 'text-[#22c55e]'}>{efficiencyRatio}%</span>
-            </div>
-            <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  efficiencyRatio > 80 ? 'bg-rose-500' : 'bg-[#22c55e] shadow-[0_0_10px_rgba(34,197,94,0.4)]'
-                }`}
-                style={{ width: `${efficiencyRatio}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Small Highlight Bento Widget: Payment status this month */}
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 flex flex-col justify-between shadow-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs text-gray-400 font-medium block">מצב תשלומים החודש</span>
-              <h3 className="text-lg font-bold text-gray-200 mt-0.5">כמה שולם וכמה נותר</h3>
-            </div>
-            <div className="p-3 bg-white/5 border border-white/5 text-[#22c55e] rounded-xl">
-              <CreditCard className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="bg-[#22c55e]/10 border border-[#22c55e]/20 rounded-xl p-3">
-              <div className="text-xs text-gray-400">שולם</div>
-              <div className="text-xl font-black text-[#22c55e] font-mono tracking-tight mt-0.5">
-                {paidThisMonth.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-              </div>
-            </div>
-            <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
-              <div className="text-xs text-gray-400">נותר לשלם</div>
-              <div className="text-xl font-black text-rose-500 font-mono tracking-tight mt-0.5">
-                {remainingThisMonth.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden border border-white/5">
-              <div
-                className="h-full rounded-full bg-[#22c55e] shadow-[0_0_10px_rgba(34,197,94,0.4)] transition-all duration-500"
-                style={{ width: `${paidPercent}%` }}
-              ></div>
-            </div>
-            <div className="text-xs text-gray-400 text-center mt-2 font-medium">
-              {paidPercent.toFixed(0)}% מההתחייבויות החודש שולמו
-            </div>
-          </div>
-        </div>
+          }
+        />
       </div>
 
-      {/* Payment schedule by billing day (fixed + variable combined) */}
-      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <h4 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-[#22c55e]" />
-          כמה צריך לשלם בכל תאריך בחודש
-        </h4>
-        <p className="text-xs text-gray-400 mb-4">סיכום כולל של הוצאות קבועות + משתנות + חובות לפי יום החיוב</p>
+      {/* ============ Cash flow + balance ============ */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="xl:col-span-8 p-5 sm:p-6">
+          <CardHead icon={BarChart3} title="תזרים: הכנסות מול הוצאות" sub="לפי חודש · החודש הפתוח מודגש">
+            <Segmented
+              size="sm"
+              label="טווח"
+              value={range}
+              onChange={setRange}
+              options={[
+                { id: '3', label: '3 חודשים' },
+                { id: '6', label: '6' },
+                { id: '12', label: '12' }
+              ]}
+            />
+          </CardHead>
+          <div className="flex items-center gap-4 mt-4 mb-1 text-xs text-muted">
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-full" style={{ background: TONES.navy }} />
+              הכנסות
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="w-2.5 h-2.5 rounded-full" style={{ background: '#d9b455' }} />
+              הוצאות
+            </span>
+          </div>
+          {shown.length ? (
+            <div key={range}>
+            <BarChart
+              height={250}
+              labels={shown.map((s) => SHORT_MONTH[s.m.month_number] || s.m.name)}
+              highlight={shown.length - 1}
+              series={[
+                { name: 'הכנסות', color: TONES.navy, values: shown.map((s) => s.income) },
+                { name: 'הוצאות', color: '#d9b455', values: shown.map((s) => s.expenses) }
+              ]}
+            />
+            </div>
+          ) : (
+            <Empty title="אין עדיין היסטוריה" text="כשיהיו כמה חודשים במערכת, הגרף יראה את המגמה." />
+          )}
+        </Card>
 
-        {/* Whole-month total banner (each block opens a full breakdown popup) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-          <button
-            onClick={() => setOpenSummary('all')}
-            className="text-right bg-white/5 border border-white/10 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-white/25 cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">סה״כ לתשלום החודש</span>
-              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
-            </div>
-            <span className="text-2xl font-black font-mono text-white">
-              {totalDayPay.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-            </span>
-          </button>
-          <button
-            onClick={() => setOpenSummary('remaining')}
-            className="text-right bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-rose-400 cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">סה״כ נותר לשלם</span>
-              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
-            </div>
-            <span className="text-2xl font-black font-mono text-rose-400">
-              {totalDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-            </span>
-          </button>
-          <button
-            onClick={() => setOpenSummary('paid')}
-            className="text-right col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4 transition-all hover:scale-[1.02] hover:border-green-400 cursor-pointer"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-400">כבר שולם</span>
-              <span className="text-[9px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
-            </div>
-            <span className="text-2xl font-black font-mono text-[#22c55e]">
-              {totalDayPaid.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-            </span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {billingDayCards.map((card) => (
-            <button
-              key={card.key}
-              onClick={() => setOpenDay(card.key)}
-              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                card.key === 'unknown'
-                  ? 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-500'
-                  : 'bg-sky-950/30 border-sky-500/30 hover:border-sky-400'
+        {/* Navy balance card */}
+        <div
+          className="xl:col-span-4 rounded-[1.6rem] p-6 relative overflow-hidden text-white flex flex-col shadow-[0_24px_50px_-24px_rgb(22_32_79_/_0.7)] min-h-[300px]"
+          style={{
+            background:
+              'radial-gradient(26rem 16rem at 0% 0%, rgb(217 180 85 / 0.24), transparent 60%), linear-gradient(155deg, #2a377a 0%, #1b2660 52%, #16204f 100%)'
+          }}
+        >
+          <svg className="absolute inset-x-0 bottom-0 w-full h-32 opacity-[0.14] pointer-events-none" viewBox="0 0 400 100" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0 70 C 60 40, 110 90, 170 60 S 290 20, 400 50 L 400 100 L 0 100 Z" fill="#d9b455" />
+          </svg>
+          <div className="relative flex items-center justify-between gap-3">
+            <span className="text-xs text-white/65 font-medium">מאזן החודש · {selectedMonthName}</span>
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                isPositive ? 'bg-emerald-400/15 text-[#86efac]' : 'bg-rose-400/15 text-[#fda4af]'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className={`w-3.5 h-3.5 ${card.key === 'unknown' ? 'text-zinc-400' : 'text-sky-300'}`} />
-                  <span className="text-xs text-gray-400 font-medium">{card.label}</span>
-                </div>
-                <span className="text-[10px] text-gray-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ לפירוט</span>
-              </div>
-              <span className={`text-xl font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
-                {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-              </span>
-              <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-gray-500">נותר לשלם</span>
-                <span className={`text-sm font-bold font-mono ${card.remaining > 0 ? 'text-rose-400' : 'text-[#22c55e]'}`}>
-                  {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Employees & payroll status */}
-      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h4 className="text-base font-bold text-white flex items-center gap-2">
-              <User className="w-5 h-5 text-[#22c55e]" />
-              עובדים ושכר החודש
-            </h4>
-            <p className="text-xs text-gray-400 mt-1">כמה מגיע לכל אחד החודש, וכמה כבר שולם</p>
-          </div>
-          {onOpenEmployees && (
-            <button
-              onClick={onOpenEmployees}
-              className="shrink-0 text-xs font-semibold text-[#22c55e] bg-[#22c55e]/10 border border-[#22c55e]/20 hover:bg-[#22c55e]/20 px-3 py-1.5 rounded-lg cursor-pointer"
-            >
-              לניהול עובדים ←
-            </button>
-          )}
-        </div>
-
-        {employees.length === 0 ? (
-          <div className="py-8 text-center text-gray-600 text-sm">עוד לא הוגדרו עובדים. הוסף אותם במסך "עובדים ושכר".</div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 block mb-1">סה״כ שכר החודש</span>
-                <span className="text-2xl font-black font-mono text-white">
-                  {payrollTotal.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                </span>
-              </div>
-              <div className="bg-rose-950/30 border border-rose-500/30 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 block mb-1">נותר לשלם לעובדים</span>
-                <span className="text-2xl font-black font-mono text-rose-400">
-                  {(payrollTotal - payrollPaid).toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                </span>
-              </div>
-              <div className="col-span-2 sm:col-span-1 bg-green-950/30 border border-green-500/30 rounded-2xl p-4">
-                <span className="text-xs text-gray-400 block mb-1">כבר שולם</span>
-                <span className="text-2xl font-black font-mono text-[#22c55e]">
-                  {payrollPaid.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            </div>
-
-            {/* By department */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {payrollByDept.map((d) => (
-                <div key={d.key} className="bg-white/5 border border-white/5 rounded-xl px-3 py-2.5">
-                  <div className="text-[11px] text-gray-400 truncate">
-                    {d.label} <span className="text-gray-600">({d.count})</span>
-                  </div>
-                  <div className="text-sm font-bold font-mono text-gray-200">
-                    {d.total.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Per person: unpaid first */}
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
-              {payrollRows.map((r) => (
-                <div
-                  key={r.emp.id}
-                  className={`flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2 ${r.status === 'שולם' ? 'opacity-50' : ''}`}
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm text-gray-200 font-medium truncate">{r.emp.name}</div>
-                    <div className="text-[11px] text-gray-500 truncate">{r.emp.role || DEPT_LABEL[r.emp.department]}</div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono font-bold text-sm text-gray-200">
-                      {r.total.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${statusBadgeCls(r.status)}`}>{r.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Budget breakdown donut — where the money went this month */}
-      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
-        <h4 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-          <Activity className="w-5 h-5 text-[#22c55e]" />
-          לאן הלך הכסף החודש
-        </h4>
-        <p className="text-xs text-gray-400 mb-5">פילוח הכנסות והוצאות לפי קטגוריה — לפי אחוזים וסכומים</p>
-
-        {pieTotal === 0 ? (
-          <div className="py-10 text-center text-gray-600 text-sm">אין עדיין נתונים להצגה לחודש זה.</div>
-        ) : (
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            {/* Donut */}
-            <svg viewBox="0 0 180 180" className="w-52 h-52 shrink-0">
-              <circle cx="90" cy="90" r={PIE_R} fill="none" stroke="#1f1f22" strokeWidth="22" />
-              <g transform="rotate(-90 90 90)">
-                {pieSegments.map((seg) =>
-                  seg.value > 0 ? (
-                    <circle
-                      key={seg.label}
-                      cx="90"
-                      cy="90"
-                      r={PIE_R}
-                      fill="none"
-                      stroke={seg.color}
-                      strokeWidth="22"
-                      strokeDasharray={`${seg.dash} ${PIE_C - seg.dash}`}
-                      strokeDashoffset={-seg.offset}
-                    />
-                  ) : null
-                )}
-              </g>
-              <text x="90" y="84" textAnchor="middle" className="fill-gray-400" style={{ fontSize: '9px' }}>
-                סה״כ תנועה
-              </text>
-              <text x="90" y="102" textAnchor="middle" className="fill-white" style={{ fontSize: '15px', fontWeight: 800 }}>
-                ₪{pieTotal.toLocaleString('he-IL', { maximumFractionDigits: 0 })}
-              </text>
-            </svg>
-
-            {/* Legend */}
-            <div className="flex-1 w-full space-y-2.5">
-              {pieSegments.map((seg) => (
-                <div
-                  key={seg.label}
-                  className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }}></span>
-                    <span className="text-sm text-gray-200 font-medium truncate">{seg.label}</span>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono font-bold text-sm" style={{ color: seg.color }}>
-                      ₪{seg.value.toLocaleString('he-IL', { maximumFractionDigits: 0 })}
-                    </span>
-                    <span className="text-xs font-bold text-gray-400 w-11 text-left">
-                      {(seg.frac * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Primary Financial Stream Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Total Income Metrics */}
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[#22c55e]">
-                <Coins className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <h4 className="text-base font-extrabold text-white">הכנסות החודש {selectedMonthName}</h4>
-                <p className="text-xs text-gray-400">פילוח לפי ערוצי סליקה ומקורות</p>
-              </div>
-            </div>
-            <span className="text-2xl font-black font-mono text-[#22c55e]">
-              {totalIncome.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
+              {isPositive ? <ArrowUpLeft className="w-3.5 h-3.5" /> : <ArrowDownLeft className="w-3.5 h-3.5" />}
+              {isPositive ? 'חודש רווחי' : 'גרעון'}
             </span>
           </div>
+          <b className={`relative num text-[40px] sm:text-[46px] font-black tracking-tight leading-none mt-4 ${isPositive ? 'text-white' : 'text-[#fda4af]'}`}>
+            {ils(netAnimated)}
+          </b>
+          <span className="relative text-xs text-white/55 mt-2">הכנסות פחות כל ההוצאות וההחזרים</span>
 
-          {/* Quick list of channels */}
-          <div className="space-y-3">
-            {['מקסימוס', 'UPS', 'מזומן', 'העברה בנקאית', 'משולם / GROW'].map((src) => {
-              const channelSum = incomeEntries
-                .filter(i => i.source === src)
-                .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-              const percent = totalIncome > 0 ? (channelSum / totalIncome) * 100 : 0;
+          <div className="relative grid grid-cols-2 gap-2.5 mt-6">
+            <div className="rounded-2xl bg-white/[0.08] border border-white/10 px-3.5 py-3">
+              <div className="text-[11px] text-white/55">נכנס</div>
+              <div className="text-base font-bold num">{ils(totalIncome)}</div>
+            </div>
+            <div className="rounded-2xl bg-white/[0.08] border border-white/10 px-3.5 py-3">
+              <div className="text-[11px] text-white/55">יצא</div>
+              <div className="text-base font-bold num">{ils(totalExpenses)}</div>
+            </div>
+          </div>
 
+          <div className="relative mt-auto pt-6">
+            <div className="flex justify-between text-xs text-white/65 mb-1.5">
+              <span>הוצאות מתוך ההכנסות</span>
+              <span className={expenseRatio > 80 ? 'text-[#fda4af] font-bold' : 'text-gold font-bold'}>{expenseRatio}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={`h-full rounded-full grow-x ${expenseRatio > 80 ? 'bg-rose-400' : 'bg-gold'}`}
+                style={{ width: `${Math.min(100, expenseRatio)}%` }}
+              />
+            </div>
+            {withData.length > 1 && (
+              <div className="text-[11px] text-white/55 mt-3">
+                ממוצע מאזן ב־{withData.length} החודשים האחרונים: <b className="text-white num">{ils(avgNet)}</b>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ============ Payment schedule + pay next ============ */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="xl:col-span-8 p-5 sm:p-6">
+          <CardHead icon={CalendarDays} title="לוח תשלומים לפי יום חיוב" sub="הוצאות קבועות, משתנות והחזרי חובות · לחיצה פותחת פירוט">
+            <Ring value={paidPct} size={54} stroke={6}>
+              <span className="text-[11px] font-extrabold text-ink num">{paidPct.toFixed(0)}%</span>
+            </Ring>
+          </CardHead>
+
+          <div className="grid grid-cols-3 gap-2 mt-5">
+            {(
+              [
+                { k: 'all', label: 'סה״כ לתשלום', v: paid + remaining, cls: 'text-ink' },
+                { k: 'remaining', label: 'נותר', v: remaining, cls: 'text-rose-600' },
+                { k: 'paid', label: 'שולם', v: paid, cls: 'text-emerald-600' }
+              ] as const
+            ).map((s) => (
+              <button
+                key={s.k}
+                type="button"
+                onClick={() => setOpenSummary(s.k)}
+                className="text-right rounded-2xl bg-panel hover:bg-[#ebeff6] px-3 sm:px-4 py-3 transition-colors cursor-pointer min-w-0"
+              >
+                <div className="text-[11px] sm:text-xs text-muted">{s.label}</div>
+                <div className={`text-[15px] sm:text-xl font-extrabold num truncate ${s.cls}`}>{ils(s.v)}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+            {days.map((d) => {
+              const pct = d.total > 0 ? ((d.total - d.left) / d.total) * 100 : 0;
+              const done = d.total > 0 && d.left === 0;
               return (
-                <div key={src} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-white font-semibold">{src}</span>
-                    <div className="space-x-1.5 rtl:space-x-reverse font-mono text-gray-450 font-medium">
-                      <span>{channelSum.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}</span>
-                      <span className="text-gray-500 text-[10px]">({percent.toFixed(0)}%)</span>
+                <button
+                  key={d.key}
+                  type="button"
+                  onClick={() => setOpenDay(d.key)}
+                  className="group text-right rounded-2xl border border-line hover:border-navy/25 hover:shadow-card bg-white p-4 transition-all cursor-pointer flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-baseline gap-1">
+                      {d.key === 'unknown' ? (
+                        <b className="text-base sm:text-lg font-extrabold text-ink-2 whitespace-nowrap">לא ידוע</b>
+                      ) : (
+                        <>
+                          <b className="text-[28px] font-black text-navy leading-none num">{d.key}</b>
+                          <span className="text-xs text-muted">לחודש</span>
+                        </>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                        done ? 'bg-emerald-50 text-emerald-600' : d.openCount ? 'bg-rose-50 text-rose-600' : 'bg-panel text-muted'
+                      }`}
+                    >
+                      {done ? 'הכל שולם' : d.openCount ? `${d.openCount} פתוחים` : 'אין'}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-lg font-extrabold text-ink num">{ils(d.total)}</div>
+                    <div className="text-[11.5px] text-muted">
+                      נותר <b className={`num ${d.left > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{ils(d.left)}</b>
                     </div>
                   </div>
-                  <div className="w-full bg-white/5 rounded-full h-1.5">
-                    <div 
-                      className="bg-[#22c55e] h-full rounded-full transition-all duration-300 shadow-[0_0_5px_rgba(34,197,94,0.3)]"
-                      style={{ width: `${percent}%` }}
-                    ></div>
-                  </div>
-                </div>
+                  <Progress value={pct} color={done ? TONES.green : TONES.navy} />
+                </button>
               );
             })}
           </div>
-        </div>
+        </Card>
 
-        {/* Total Expenses Metrics */}
-        <div className="bg-[#111] border border-white/10 rounded-2xl p-6 space-y-4 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/5 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-rose-500">
-                <CreditCard className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-base font-extrabold text-white">הוצאות החודש {selectedMonthName}</h4>
-                <p className="text-xs text-gray-400">תעדוף וצרכים תפעוליים</p>
-              </div>
-            </div>
-            <span className="text-2xl font-black font-mono text-rose-500">
-              {totalExpenses.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-            </span>
-          </div>
-
-          {/* Quick list of expense groups */}
-          <div className="space-y-4 pt-1">
-            
-            {/* Fixed Expenses Row */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-100 font-semibold">הוצאות קבועות</span>
-                <span className="font-mono text-gray-400">
-                  {totalFixed.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })} ({fixedPercent.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden">
-                <div 
-                  className="bg-amber-400 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${fixedPercent}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Variable Expenses Row */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-100 font-semibold">הוצאות משתנות</span>
-                <span className="font-mono text-gray-400">
-                  {totalVariable.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })} ({variablePercent.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden">
-                <div 
-                  className="bg-indigo-400 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${variablePercent}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Debts Repayment Row */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-100 font-semibold">תשלומי חובות והתחייבויות</span>
-                <span className="font-mono text-gray-400">
-                  {totalDebts.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })} ({debtsPercent.toFixed(0)}%)
-                </span>
-              </div>
-              <div className="w-full bg-white/5 rounded-full h-2.5 overflow-hidden">
-                <div 
-                  className="bg-rose-500 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${debtsPercent}%` }}
-                ></div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-      </div>
-
-      {/* Visual representation card */}
-      <div className="bg-[#111] border border-white/10 rounded-2xl p-6 relative overflow-hidden shadow-2xl">
-        <h4 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <Calculator className="w-5 h-5 text-[#22c55e]" />
-          סיכום תזרים יתרות לפי חוק שירותים פיננסיים
-        </h4>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-            <span className="text-xs text-gray-400 block">סך הכנסות ברוטו</span>
-            <span className="text-base sm:text-lg font-bold text-[#22c55e] font-mono tracking-tight block mt-1">
-              +{totalIncome.toLocaleString('he-IL', { maximumFractionDigits: 0 })} ₪
-            </span>
-          </div>
-
-          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-            <span className="text-xs text-gray-400 block">קבועות (תפעולי)</span>
-            <span className="text-base sm:text-lg font-bold text-amber-500 font-mono tracking-tight block mt-1">
-              -{totalFixed.toLocaleString('he-IL', { maximumFractionDigits: 0 })} ₪
-            </span>
-          </div>
-
-          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-            <span className="text-xs text-gray-400 block">משתנות (רכש ופרסום)</span>
-            <span className="text-base sm:text-lg font-bold text-indigo-400 font-mono tracking-tight block mt-1">
-              -{totalVariable.toLocaleString('he-IL', { maximumFractionDigits: 0 })} ₪
-            </span>
-          </div>
-
-          <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-            <span className="text-xs text-gray-400 block">פרעון חוב חודשי</span>
-            <span className="text-base sm:text-lg font-bold text-rose-500 font-mono tracking-tight block mt-1">
-              -{totalDebts.toLocaleString('he-IL', { maximumFractionDigits: 0 })} ₪
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Billing-day popup: who still needs to be paid + their patience level */}
-      {openDay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenDay(null)}></div>
-          <div className="relative bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-sky-300" />
-                  למי נותר לשלם — {openDayLabel}
-                </h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  סה״כ נותר: <span className="text-rose-400 font-bold font-mono">
-                    {openDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => setOpenDay(null)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
-                title="סגור"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="overflow-y-auto p-4 space-y-2.5">
-              {openDayItems.length === 0 ? (
-                <div className="py-10 text-center text-[#22c55e] text-sm font-semibold">
-                  אין תשלומים בתאריך הזה.
-                </div>
-              ) : (
-                openDayItems.map((o) => {
-                  const mood = MOODS[o.mood] || MOODS.happy;
-                  const isPaid = o.status === 'שולם';
-                  return (
-                    <div
-                      key={o.source + o.id}
-                      className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-white/5 border border-white/5 rounded-xl px-4 py-3 transition-opacity ${
-                        isPaid ? 'opacity-50' : ''
-                      }`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-sm font-semibold text-white truncate ${isPaid ? 'line-through' : ''}`}>{o.name}</div>
-                        <div className="text-xs text-gray-500">{sourceLabel(o.source)}</div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`font-mono font-bold text-sm ${isPaid ? 'text-gray-400' : 'text-rose-400'}`}>
-                          {o.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                        </span>
-                        <button
-                          onClick={() => cycleStatus(o)}
-                          title="לחץ לשינוי סטטוס התשלום"
-                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer whitespace-nowrap transition-all hover:scale-105 ${statusBadgeCls(o.status)}`}
-                        >
-                          {o.status}
-                        </button>
-                        <button
-                          onClick={() => cycleMood(o)}
-                          title="לחץ לשינוי רמת הכעס"
-                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-all hover:scale-105 ${mood.cls}`}
-                        >
-                          <span className="text-base leading-none">{mood.emoji}</span>
-                          <span className="hidden sm:inline">{mood.label}</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Footer legend */}
-            <div className="px-5 py-3 border-t border-white/10 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-400">
-              <span>😊 רגוע</span>
-              <span>😐 העיר על זה</span>
-              <span>😠 דורש את הכסף</span>
-              <span className="text-gray-600">· לחץ על הסטטוס או הפרצוף כדי לעדכן</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Whole-month summary popup (all / remaining / paid) */}
-      {openSummary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenSummary(null)}></div>
-          <div className="relative bg-[#111] border border-white/10 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <div>
-                <h3 className="text-base font-bold text-white">{summaryConfig[openSummary].title}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {summaryItems.length} פריטים · סה״כ <span className="font-bold font-mono text-white">
-                    {summaryTotal.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => setOpenSummary(null)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
-                title="סגור"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="overflow-y-auto p-4 space-y-2">
-              {summaryItems.length === 0 ? (
-                <div className="py-10 text-center text-gray-600 text-sm">אין פריטים להצגה.</div>
-              ) : (
-                summaryItems.map((o) => (
-                  <div key={o.source + o.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white truncate">{o.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {sourceLabel(o.source)} · {dayLabelOf(o.dayKey)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <span className={`px-2 py-1 rounded-md text-[11px] font-semibold border ${statusBadgeCls(o.status)}`}>
-                        {o.status}
-                      </span>
-                      <span className="font-mono font-bold text-sm text-gray-200 w-20 text-left">
-                        {o.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
-                      </span>
+        <Card className="xl:col-span-4 p-5 sm:p-6 flex flex-col">
+          <CardHead icon={Flame} title="לשלם עכשיו" sub="קודם מי שהכי לחוץ, אחר כך לפי תאריך">
+            <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-rose-50 text-rose-600">{payNext.length}</span>
+          </CardHead>
+          {payNext.length === 0 ? (
+            <Empty icon={Check} title="הכל שולם החודש" text="אין תשלומים פתוחים. יפה מאוד." />
+          ) : (
+            <ul className="mt-4 space-y-1.5 flex-1">
+              {payNext.slice(0, 6).map((o) => (
+                <li key={o.source + o.id} className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-panel transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => markPaid(o)}
+                    title="סמן כשולם"
+                    aria-label={`סמן כשולם: ${o.name}`}
+                    className="w-8 h-8 shrink-0 rounded-full border-2 border-line text-transparent hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 grid place-items-center transition-all cursor-pointer active:scale-90"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-ink truncate">{o.name}</div>
+                    <div className="text-[11px] text-muted truncate">
+                      {sourceLabel(o.source)} · {dayLabel(o.dayKey)}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                  <MoodChip mood={o.mood} compact onClick={() => saveObligation(o, { mood: nextMood(o.mood) })} />
+                  <b className="text-sm font-bold text-ink num w-[4.8rem] text-left shrink-0">{ils(o.amount)}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+          {payNext.length > 6 && (
+            <Button variant="soft" size="sm" className="mt-3 w-full" onClick={() => setOpenSummary('remaining')}>
+              עוד {payNext.length - 6} תשלומים פתוחים
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </Card>
+      </div>
 
+      {/* ============ Where the money went + income sources ============ */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="xl:col-span-5 p-5 sm:p-6">
+          <CardHead icon={PieChart} title="לאן הלך הכסף" sub="הכנסות והוצאות החודש לפי קטגוריה" />
+          {pieTotal === 0 ? (
+            <Empty title="אין נתונים לחודש הזה" />
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center gap-6 mt-5">
+              <Donut
+                segments={pie}
+                size={176}
+                center={
+                  <div>
+                    <div className="text-[11px] text-muted">סה״כ תנועה</div>
+                    <div className="text-base font-extrabold text-ink num">{ils(pieTotal)}</div>
+                  </div>
+                }
+              />
+              <ul className="flex-1 w-full space-y-2.5">
+                {pie.map((s) => (
+                  <li key={s.label} className="flex items-center gap-2.5">
+                    <i className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                    <span className="text-sm text-ink-2 flex-1 truncate">{s.label}</span>
+                    <b className="text-sm text-ink num">{ils(s.value)}</b>
+                    <span className="text-[11px] font-bold text-muted w-9 text-left num">
+                      {pieTotal ? ((s.value / pieTotal) * 100).toFixed(0) : 0}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+
+        <Card className="xl:col-span-7 p-5 sm:p-6">
+          <CardHead icon={Coins} title="מקורות הכנסה" sub={`סה״כ ${ils(totalIncome)} החודש`}>
+            {onNavigate && (
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('income')}>
+                לכל ההכנסות
+              </Button>
+            )}
+          </CardHead>
+          <ul className="mt-5 space-y-4">
+            {channels.map((c, i) => (
+              <li key={c.src}>
+                <div className="flex items-center justify-between text-sm mb-1.5">
+                  <span className="font-semibold text-ink">{c.src}</span>
+                  <span className="flex items-center gap-2">
+                    <b className="num text-ink">{ils(c.sum)}</b>
+                    <span className="text-[11px] font-bold text-muted w-9 text-left num">{c.pct.toFixed(0)}%</span>
+                  </span>
+                </div>
+                <Progress value={c.pct} color={i === 0 ? TONES.navy : i === 1 ? '#d9b455' : '#9aa6c8'} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      {/* ============ Payroll + debts ============ */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="xl:col-span-7 p-5 sm:p-6">
+          <CardHead icon={Users} title="עובדים ושכר החודש" sub="כמה מגיע לכל אחד וכמה כבר שולם">
+            {onOpenEmployees && (
+              <Button variant="ghost" size="sm" onClick={onOpenEmployees}>
+                לניהול עובדים
+              </Button>
+            )}
+          </CardHead>
+          {employees.length === 0 ? (
+            <Empty title="עוד לא הוגדרו עובדים" text="מוסיפים אותם במסך ״עובדים ושכר״." />
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5 mt-5">
+                <Ring value={payrollPct} size={116} stroke={11} color={TONES.navy}>
+                  <div>
+                    <div className="text-lg font-extrabold text-ink num">{payrollPct.toFixed(0)}%</div>
+                    <div className="text-[10.5px] text-muted">שולם</div>
+                  </div>
+                </Ring>
+                <div className="grid grid-cols-3 gap-2 flex-1">
+                  <div className="rounded-2xl bg-panel px-3 py-3 min-w-0">
+                    <div className="text-[11px] text-muted">סה״כ שכר</div>
+                    <div className="text-[15px] sm:text-lg font-extrabold text-ink num truncate">{ils(payrollTotal)}</div>
+                  </div>
+                  <div className="rounded-2xl bg-panel px-3 py-3 min-w-0">
+                    <div className="text-[11px] text-muted">נותר</div>
+                    <div className="text-[15px] sm:text-lg font-extrabold text-rose-600 num truncate">{ils(payrollTotal - payrollPaid)}</div>
+                  </div>
+                  <div className="rounded-2xl bg-panel px-3 py-3 min-w-0">
+                    <div className="text-[11px] text-muted">שולם</div>
+                    <div className="text-[15px] sm:text-lg font-extrabold text-emerald-600 num truncate">{ils(payrollPaid)}</div>
+                  </div>
+                  {(Object.keys(DEPT_LABEL) as Department[]).map((dep) => {
+                    const rows = payrollRows.filter((r) => r.emp.department === dep);
+                    return (
+                      <div key={dep} className="rounded-xl border border-line px-3 py-2 min-w-0">
+                        <div className="text-[10.5px] text-muted truncate">
+                          {DEPT_LABEL[dep]} · {rows.length}
+                        </div>
+                        <div className="text-sm font-bold text-ink num truncate">{ils(rows.reduce((a, r) => a + r.total, 0))}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <ul className="mt-4 divide-y divide-line max-h-64 overflow-y-auto">
+                {payrollRows.map((r) => (
+                  <li key={r.emp.id} className={`flex items-center gap-3 py-2.5 ${r.status === 'שולם' ? 'opacity-55' : ''}`}>
+                    <span className="w-8 h-8 rounded-full bg-gold-soft text-gold-2 grid place-items-center text-xs font-black shrink-0">
+                      {r.emp.name.trim().charAt(0)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-ink truncate">{r.emp.name}</div>
+                      <div className="text-[11px] text-muted truncate">{r.emp.role || DEPT_LABEL[r.emp.department]}</div>
+                    </div>
+                    <b className="text-sm text-ink num">{ils(r.total)}</b>
+                    <StatusPill status={r.status} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </Card>
+
+        <Card className="xl:col-span-5 p-5 sm:p-6">
+          <CardHead icon={Landmark} title="חובות והלוואות" sub={`יתרה כוללת ${ils(debtBalance)}`}>
+            {onNavigate && (
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('debts')}>
+                לכל החובות
+              </Button>
+            )}
+          </CardHead>
+          {debtRows.length === 0 ? (
+            <Empty title="אין חובות החודש" />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {debtRows.slice(0, 6).map((r) => (
+                <li key={r.d.id} className="rounded-2xl border border-line px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-ink truncate">{r.d.name}</span>
+                    <b className="text-sm text-ink num shrink-0">{ils(r.bal)}</b>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 mt-1 text-[11.5px] text-muted">
+                    <span>
+                      החזר <b className="text-ink-2 num">{ils(r.pay)}</b> לחודש
+                    </span>
+                    {r.left !== null && (
+                      <span className={`font-semibold ${r.left === 0 ? 'text-emerald-600' : 'text-navy'}`}>
+                        {r.left === 0 ? 'תשלום אחרון' : `עוד ${r.left} תשלומים`}
+                      </span>
+                    )}
+                  </div>
+                  {r.progress !== null && <Progress className="mt-2" value={r.progress} color={TONES.gold} />}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {/* ============ Drawer: one billing day / a whole-month list ============ */}
+      <Drawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        icon={CalendarDays}
+        title={openDay ? `תשלומים · ${dayLabel(openDay)}` : openSummary ? summaryCfg[openSummary].title : ''}
+        sub={
+          <>
+            {drawerItems.length} פריטים · סה״כ <b className="text-ink num">{ils(drawerTotal)}</b>
+            {drawerLeft > 0 && (
+              <>
+                {' '}
+                · נותר <b className="text-rose-600 num">{ils(drawerLeft)}</b>
+              </>
+            )}
+          </>
+        }
+        footer={
+          <div className="text-[11.5px] text-muted leading-relaxed">
+            לחיצה על הסטטוס מחליפה אותו (לא שולם ← שולם חלקית ← שולם). לחיצה על הפרצוף מעדכנת כמה הספק לחוץ: 😊 רגוע · 😐 העיר על זה · 😠 דורש את הכסף
+          </div>
+        }
+      >
+        {drawerItems.length === 0 ? (
+          <Empty icon={Check} title="אין תשלומים כאן" />
+        ) : (
+          <ul className="space-y-2">
+            {drawerItems.map((o) => {
+              const isPaid = o.status === 'שולם';
+              return (
+                <li
+                  key={o.source + o.id}
+                  className={`rounded-2xl border border-line px-4 py-3 transition-opacity ${isPaid ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className={`text-sm font-semibold text-ink truncate ${isPaid ? 'line-through decoration-muted' : ''}`}>{o.name}</div>
+                      <div className="text-[11px] text-muted">
+                        {sourceLabel(o.source)}
+                        {openSummary ? ` · ${dayLabel(o.dayKey)}` : ''}
+                      </div>
+                    </div>
+                    <b className={`text-sm num shrink-0 ${isPaid ? 'text-muted' : 'text-ink'}`}>{ils(o.amount)}</b>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <StatusPill status={o.status} onClick={() => saveObligation(o, { status: nextStatus(o.status) })} />
+                    <MoodChip mood={o.mood} onClick={() => saveObligation(o, { mood: nextMood(o.mood) })} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Drawer>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { 
   Month, 
   FixedExpense, 
@@ -22,6 +22,8 @@ import DebtsView from './components/DebtsView';
 import IncomeView from './components/IncomeView';
 import DeliveriesView from './components/DeliveriesView';
 import EmployeesView from './components/EmployeesView';
+import CommandPalette, { PaletteItem } from './components/CommandPalette';
+import { useToasts, ToastViewport } from './components/Toasts';
 
 import { 
   Diamond, 
@@ -43,8 +45,17 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Landmark
+  Landmark,
+  Search,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  PanelRightClose,
+  CalendarDays
 } from 'lucide-react';
+
+// Undo window before a delete is actually sent to the database
+const UNDO_MS = 6000;
 
 type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries' | 'employees';
 
@@ -66,6 +77,16 @@ export default function App() {
   const [payNotif, setPayNotif] = useState<{ name: string; amount: number; mood: string }[] | null>(null);
   const payNotifShown = useRef(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  // Collapsible desktop sidebar, remembered per browser (storage may be blocked — never crash on it)
+  const [sideCollapsed, setSideCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ice_side_collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
 
   // Month select parameters
   const [months, setMonths] = useState<Month[]>([]);
@@ -328,6 +349,61 @@ export default function App() {
     }
   };
 
+  // ---------- Delete with undo ----------
+  // The row disappears at once; the real delete is sent only after UNDO_MS.
+  // "בטל" in the toast puts the row back and nothing is deleted.
+  const activeMonthRef = useRef(activeMonthId);
+  activeMonthRef.current = activeMonthId;
+
+  function scheduleDelete<T extends { id: string }>(opts: {
+    label: string;
+    list: T[];
+    id: string;
+    setList: React.Dispatch<React.SetStateAction<T[]>>;
+    commit: () => Promise<void>;
+    monthScoped?: boolean; // restore only while the same month is still open
+    afterCommit?: () => void;
+  }) {
+    const at = opts.list.findIndex((x) => x.id === opts.id);
+    const item = opts.list[at];
+    if (!item) return;
+    const monthAtDelete = activeMonthRef.current;
+
+    opts.setList((prev) => prev.filter((x) => x.id !== opts.id));
+
+    const restore = () => {
+      // After a month switch the list holds another month's rows; the item
+      // was never deleted from the database, so it is simply there next time.
+      if (opts.monthScoped && activeMonthRef.current !== monthAtDelete) return;
+      opts.setList((prev) => (prev.some((x) => x.id === opts.id) ? prev : [...prev.slice(0, at), item, ...prev.slice(at)]));
+    };
+
+    let undone = false;
+    const timer = setTimeout(async () => {
+      if (undone) return;
+      try {
+        await opts.commit();
+        opts.afterCommit?.();
+      } catch (err) {
+        console.error(err);
+        restore();
+        pushToast(`המחיקה של "${opts.label}" נכשלה — השורה הוחזרה`, { tone: 'error', duration: 6000 });
+      }
+    }, UNDO_MS);
+
+    pushToast(`"${opts.label}" נמחק`, {
+      duration: UNDO_MS,
+      action: {
+        label: 'בטל',
+        run: () => {
+          undone = true;
+          clearTimeout(timer);
+          restore();
+        }
+      }
+    });
+  }
+
   // Content Actions (Fixed Expenses)
   const handleSaveFixedExpense = async (item: Omit<FixedExpense, 'id'> & { id?: string }) => {
     try {
@@ -346,12 +422,14 @@ export default function App() {
   };
 
   const handleDeleteFixedExpense = async (id: string) => {
-    try {
-      await dbService.deleteFixedExpense(id);
-      setFixedExpenses(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    scheduleDelete({
+      label: fixedExpenses.find((x) => x.id === id)?.name || 'הוצאה',
+      list: fixedExpenses,
+      id,
+      setList: setFixedExpenses,
+      commit: () => dbService.deleteFixedExpense(id),
+      monthScoped: true
+    });
   };
 
   // Content Actions (Variable Expenses)
@@ -372,12 +450,14 @@ export default function App() {
   };
 
   const handleDeleteVariableExpense = async (id: string) => {
-    try {
-      await dbService.deleteVariableExpense(id);
-      setVariableExpenses(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    scheduleDelete({
+      label: variableExpenses.find((x) => x.id === id)?.name || 'הוצאה',
+      list: variableExpenses,
+      id,
+      setList: setVariableExpenses,
+      commit: () => dbService.deleteVariableExpense(id),
+      monthScoped: true
+    });
   };
 
   // Content Actions (Debts)
@@ -398,12 +478,14 @@ export default function App() {
   };
 
   const handleDeleteDebt = async (id: string) => {
-    try {
-      await dbService.deleteDebt(id);
-      setDebts(prev => prev.filter(d => d.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    scheduleDelete({
+      label: debts.find((x) => x.id === id)?.name || 'חוב',
+      list: debts,
+      id,
+      setList: setDebts,
+      commit: () => dbService.deleteDebt(id),
+      monthScoped: true
+    });
   };
 
   // Content Actions (Income)
@@ -424,12 +506,15 @@ export default function App() {
   };
 
   const handleDeleteIncomeEntry = async (id: string) => {
-    try {
-      await dbService.deleteIncomeEntry(id);
-      setIncomeEntries(prev => prev.filter(i => i.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const entry = incomeEntries.find((x) => x.id === id);
+    scheduleDelete({
+      label: entry ? `הכנסה ${entry.source}` : 'הכנסה',
+      list: incomeEntries,
+      id,
+      setList: setIncomeEntries,
+      commit: () => dbService.deleteIncomeEntry(id),
+      monthScoped: true
+    });
   };
 
   // Content Actions (Deliveries)
@@ -450,12 +535,15 @@ export default function App() {
   };
 
   const handleDeleteDelivery = async (id: string) => {
-    try {
-      await dbService.deleteDelivery(id);
-      setDeliveries(prev => prev.filter(d => d.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const del = deliveries.find((x) => x.id === id);
+    scheduleDelete({
+      label: del ? `שליחות ${del.route_from} ← ${del.route_to}` : 'שליחות',
+      list: deliveries,
+      id,
+      setList: setDeliveries,
+      commit: () => dbService.deleteDelivery(id),
+      monthScoped: true
+    });
   };
 
   // Content Actions (Employees / payroll) — failures are shown, not swallowed
@@ -470,14 +558,20 @@ export default function App() {
   };
 
   const handleDeleteEmployee = async (id: string) => {
-    try {
-      await dbService.deleteEmployee(id);
-      setEmployees(prev => prev.filter(e => e.id !== id).map(e => (e.manager_id === id ? { ...e, manager_id: null } : e)));
-      setEmployeeMonths(prev => prev.filter(m => m.employee_id !== id));
-    } catch (err) {
-      console.error(err);
-      alert('מחיקת העובד נכשלה.');
-    }
+    // Employees are not month-scoped, so undo always restores. Their monthly rows
+    // stay in state untouched until the delete is committed (DB cascades them).
+    scheduleDelete({
+      label: employees.find((x) => x.id === id)?.name || 'עובד',
+      list: employees,
+      id,
+      setList: setEmployees,
+      commit: () => dbService.deleteEmployee(id),
+      afterCommit: () => {
+        // mirror the DB: ON DELETE SET NULL for reps under this manager, cascade for month rows
+        setEmployees((prev) => prev.map((e) => (e.manager_id === id ? { ...e, manager_id: null } : e)));
+        setEmployeeMonths((prev) => prev.filter((m) => m.employee_id !== id));
+      }
+    });
   };
 
   const handleSaveEmployeeMonth = async (row: Omit<EmployeeMonth, 'id'> & { id?: string }) => {
@@ -504,24 +598,82 @@ export default function App() {
   const activeMonthObject = months.find(m => m.id === activeMonthId);
   const activeMonthName = activeMonthObject ? `${activeMonthObject.name} ${activeMonthObject.year}` : 'טוען...';
 
-  // Navigation schema
+  // Navigation schema (grouped like a SaaS sidebar)
   const navItems = [
-    { id: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
-    { id: 'income', label: 'הכנסות', icon: Coins },
-    { id: 'fixed_expenses', label: 'הוצאות קבועות', icon: FileText },
-    { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard },
-    { id: 'debts', label: 'חובות והלוואות', icon: Landmark },
-    { id: 'deliveries', label: 'שליחויות', icon: Truck },
-    { id: 'employees', label: 'עובדים ושכר', icon: User },
+    { id: 'dashboard', label: 'לוח בקרה', icon: LayoutDashboard, group: 'ראשי', desc: 'תמונת מצב של החודש: מאזן, תשלומים, חובות ושכר' },
+    { id: 'income', label: 'הכנסות', icon: Coins, group: 'כספים', desc: 'כל ההכנסות של החודש לפי מקור' },
+    { id: 'fixed_expenses', label: 'הוצאות קבועות', icon: FileText, group: 'כספים', desc: 'תשלומים קבועים שחוזרים כל חודש' },
+    { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard, group: 'כספים', desc: 'רכש, ספקים ותשלומים משתנים' },
+    { id: 'debts', label: 'חובות והלוואות', icon: Landmark, group: 'כספים', desc: 'הלוואות, יתרות וכמה תשלומים נותרו' },
+    { id: 'deliveries', label: 'שליחויות', icon: Truck, group: 'כספים', desc: 'משלוחים והפצה, נטו וכולל מע״מ' },
+    { id: 'employees', label: 'עובדים ושכר', icon: User, group: 'צוות', desc: 'שכר, עמלות וסטטוס תשלום לכל איש צוות' },
+  ];
+  const navGroups = ['ראשי', 'כספים', 'צוות'];
+  const currentNav = navItems.find((n) => n.id === activePage) || navItems[0];
+
+  // Ctrl+K / ⌘K opens the command palette from anywhere
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Remember the sidebar state
+  useEffect(() => {
+    try {
+      localStorage.setItem('ice_side_collapsed', sideCollapsed ? '1' : '0');
+    } catch {
+      /* storage blocked — the toggle still works for this visit */
+    }
+  }, [sideCollapsed]);
+
+  // White pill that slides behind the active sidebar item
+  const navRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [pill, setPill] = useState<{ top: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = navRefs.current[activePage];
+    if (el) setPill({ top: el.offsetTop, height: el.offsetHeight });
+  }, [activePage, sideCollapsed, currentUser, authChecking]);
+
+  // Everything the palette can jump to: pages, months, actions, and this month's records
+  const goTo = (page: ActivePage) => {
+    setActivePage(page);
+    setMobileNavOpen(false);
+  };
+  const ils0 = (n: number) => n.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 });
+  const paletteItems: PaletteItem[] = [
+    ...navItems.map((n) => ({ id: `page-${n.id}`, label: n.label, sub: n.desc, group: 'מעבר לעמוד', icon: n.icon, run: () => goTo(n.id as ActivePage) })),
+    { id: 'act-add-month', label: 'הוספת חודש חדש', group: 'פעולות מהירות', icon: Plus, run: () => setIsAddingMonthModal(true) },
+    { id: 'act-export', label: 'ייצוא החודש לאקסל', sub: activeMonthName, group: 'פעולות מהירות', icon: Download, run: () => handleExportMonth() },
+    ...[...months]
+      .sort((a, b) => b.year - a.year || b.month_number - a.month_number)
+      .map((m) => ({
+        id: `month-${m.id}`,
+        label: m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`,
+        sub: m.id === activeMonthId ? 'החודש הפתוח כרגע' : 'מעבר לחודש',
+        group: 'חודשים',
+        icon: CalendarDays,
+        run: () => setActiveMonthId(m.id)
+      })),
+    ...fixedExpenses.map((e) => ({ id: `fe-${e.id}`, label: e.name, sub: `הוצאה קבועה · ${ils0(Number(e.amount) || 0)} · ${e.status}`, group: 'ברשומות החודש', icon: FileText, run: () => goTo('fixed_expenses') })),
+    ...variableExpenses.map((e) => ({ id: `ve-${e.id}`, label: e.name, sub: `הוצאה משתנה · ${ils0(Number(e.amount) || 0)} · ${e.status}`, group: 'ברשומות החודש', icon: CreditCard, run: () => goTo('variable_expenses') })),
+    ...debts.map((d) => ({ id: `de-${d.id}`, label: d.name, sub: `חוב · החזר ${ils0(Number(d.monthly_payment) || 0)} · יתרה ${ils0(Number(d.current_balance) || 0)}`, group: 'ברשומות החודש', icon: Landmark, run: () => goTo('debts') })),
+    ...deliveries.map((d) => ({ id: `dl-${d.id}`, label: `${d.route_from} ← ${d.route_to}`, sub: `שליחות · ${ils0(Number(d.price) || 0)}`, group: 'ברשומות החודש', icon: Truck, run: () => goTo('deliveries') })),
+    ...employees.map((e) => ({ id: `em-${e.id}`, label: e.name, sub: `עובד · ${e.role || ''}`, group: 'צוות', icon: User, run: () => goTo('employees') }))
   ];
 
   // Render check
   if (authChecking) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0a0a0a] text-zinc-400">
+      <div className="flex h-screen items-center justify-center text-muted">
         <div className="text-center space-y-4">
-          <Diamond className="w-10 h-10 animate-spin text-[#22c55e] mx-auto" />
-          <p className="text-sm font-semibold tracking-wider font-mono">טוען נתונים פיננסיים...</p>
+          <BrandLogo size={64} cutout="#e8ecf4" className="mx-auto animate-pulse" />
+          <p className="text-sm font-semibold tracking-wide">טוען נתונים פיננסיים...</p>
         </div>
       </div>
     );
@@ -532,185 +684,257 @@ export default function App() {
     return <LoginView onLoginSuccess={(user) => setCurrentUser(user)} />;
   }
 
+  const initials = currentUser?.email ? currentUser.email.substring(0, 2).toUpperCase() : 'ID';
+  const sortedMonths = [...months].sort((a, b) => a.year - b.year || a.month_number - b.month_number);
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-100 flex flex-col font-sans antialiased text-right">
-      
-      {/* 1. Header (Brand, Sticky month selector, and User panel) */}
-      <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-8 border-b border-white/10 bg-[#0d0d0d]">
-        <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-3">
-          
-          {/* Logo brand */}
-          <div className="flex items-center gap-3">
-            <BrandLogo size={42} className="shrink-0" />
-            <div className="flex flex-col">
-              <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-white leading-none">ICE DIAMONDS</h1>
-              <span className="text-[10px] sm:text-[11px] text-[#22c55e] font-sans tracking-wide">מערכת ניהול כספים</span>
-            </div>
-          </div>
+    <div className="min-h-screen text-ink font-sans antialiased text-right md:p-4 lg:p-5">
+      {/* Frame: navy brand gradient that holds the sidebar and the light panel */}
+      <div
+        className={`mx-auto max-w-[1680px] md:min-h-[calc(100vh-2rem)] lg:min-h-[calc(100vh-2.5rem)] md:rounded-[2.2rem] md:p-2.5 md:ps-0 md:grid transition-[grid-template-columns] duration-500 ${
+          sideCollapsed ? 'md:grid-cols-[5.4rem_minmax(0,1fr)]' : 'md:grid-cols-[15.5rem_minmax(0,1fr)]'
+        }`}
+        style={{
+          background:
+            'radial-gradient(38rem 26rem at 100% -10%, rgb(217 180 85 / 0.18), transparent 60%), radial-gradient(30rem 30rem at 0% 110%, rgb(255 255 255 / 0.06), transparent 60%), linear-gradient(165deg, #2a377a 0%, #1b2660 38%, #16204f 70%, #0f1638 100%)',
+          boxShadow: '0 30px 70px -30px rgb(22 32 79 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.12)'
+        }}
+      >
+        {/* ---------- Sidebar (desktop) ---------- */}
+        <aside className="hidden md:flex relative flex-col text-white py-6 px-3.5 min-w-0">
+          {/* collapse toggle, on the edge facing the panel */}
+          <button
+            onClick={() => setSideCollapsed((c) => !c)}
+            className="absolute top-7 -left-3.5 z-10 w-7 h-7 grid place-items-center rounded-full bg-white text-navy shadow-pop hover:scale-110 transition-transform cursor-pointer"
+            title={sideCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+            aria-label={sideCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+          >
+            <PanelRightClose className={`w-3.5 h-3.5 transition-transform duration-500 ${sideCollapsed ? 'rotate-180' : ''}`} />
+          </button>
 
-          {/* Sticky month selector with options to add additional months online */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex items-center gap-1.5 bg-[#1a1a1a] px-3 py-1.5 rounded-full border border-white/5 hover:border-[#22c55e]/50 transition-colors">
-              <select
-                id="month-selector-dropdown"
-                value={activeMonthId}
-                onChange={(e) => setActiveMonthId(e.target.value)}
-                className="bg-transparent border-none text-xs font-semibold text-white outline-none cursor-pointer appearance-none pr-1 pl-5 rtl:pl-1 rtl:pr-5 select-none"
-              >
-                {isLoadingMonths ? (
-                  <option className="bg-[#1a1a1a]">נטען...</option>
-                ) : (
-                  [...months]
-                    .sort((a, b) => a.year - b.year || a.month_number - b.month_number)
-                    .map((m) => (
-                      <option key={m.id} value={m.id} className="bg-[#1c1c1c] text-white">
-                        {m.name} {m.year}
-                      </option>
-                    ))
-                )}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute left-2 pointer-events-none" />
-            </div>
-
-            {/* Add Month Quick button */}
-            <button
-              id="trigger-add-month-modal"
-              onClick={() => setIsAddingMonthModal(true)}
-              className="p-1.5 bg-[#1a1a1a] hover:bg-white/5 border border-white/5 hover:border-[#22c55e]/30 rounded-full text-[#22c55e] hover:text-[#22c55e]/80 transition-all cursor-pointer flex items-center justify-center"
-              title="הוסף חודש חדש"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-
-            {/* Export active month to Excel */}
-            <button
-              id="export-month-excel"
-              onClick={handleExportMonth}
-              disabled={isExporting || !activeMonthId}
-              className="flex items-center gap-1.5 p-1.5 md:px-3 bg-[#1a1a1a] hover:bg-white/5 border border-white/5 hover:border-[#22c55e]/30 rounded-full text-[#22c55e] text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-              title="ייצוא החודש לאקסל"
-            >
-              <Download className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
-              <span className="hidden md:inline">{isExporting ? 'מייצא...' : 'ייצוא לאקסל'}</span>
-            </button>
-          </div>
-
-          {/* User information & Logout trigger */}
-          <div className="hidden md:flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs text-zinc-300">
-              <div className="w-9 h-9 rounded-full bg-[#22c55e] flex items-center justify-center font-black text-black text-xs select-none shadow-[0_0_10px_rgba(34,197,94,0.2)]">
-                {currentUser?.email ? currentUser.email.substring(0, 2).toUpperCase() : 'ID'}
+          {/* brand */}
+          <div className={`flex items-center gap-3 mb-7 ${sideCollapsed ? 'justify-center' : 'px-1.5'}`}>
+            <BrandLogo size={44} cutout="#1b2660" className="drop-shadow-[0_4px_10px_rgba(0,0,0,0.35)] shrink-0" />
+            {!sideCollapsed && (
+              <div className="min-w-0">
+                <div className="text-[17px] font-extrabold tracking-tight leading-none">ICE DIAMONDS</div>
+                <div className="text-[11px] font-medium text-gold mt-1">מערכת ניהול כספים</div>
               </div>
-              <span className="font-mono max-w-[120px] truncate block text-zinc-400" title={currentUser.email}>
-                {currentUser.email}
-              </span>
-            </div>
-            
-            <button
-              id="desktop-logout-btn"
-              onClick={handleLogout}
-              className="px-3 py-1.5 text-xs text-gray-400 hover:text-rose-450 bg-[#1a1a1a] hover:bg-rose-950/20 border border-white/5 hover:border-rose-500/10 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer font-medium"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>יציאה</span>
-            </button>
+            )}
           </div>
 
-          {/* Mobile: hamburger menu trigger */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              id="mob-menu-toggle"
-              onClick={() => setMobileNavOpen(true)}
-              className="p-2 bg-[#1a1a1a] border border-white/5 text-[#22c55e] hover:bg-white/5 rounded-full transition-colors cursor-pointer"
-              title="תפריט"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-
-        </div>
-      </header>
-
-      {/* 2. Top Summary Strip on every page */}
-      <section className="h-12 bg-[#141414] border-b border-white/5 flex items-center px-4 sm:px-8 gap-6 sm:gap-12 text-xs sm:text-sm overflow-x-auto whitespace-nowrap scrollbar-none select-none">
-        <div className="max-w-7xl mx-auto w-full flex items-center gap-6 sm:gap-12">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">חודש פעיל:</span>
-            <span className="font-bold text-white">{activeMonthObject ? `${activeMonthObject.name} ${activeMonthObject.year}` : 'טוען...'}</span>
-          </div>
-
-          <div className="h-4 w-px bg-white/10 shrink-0"></div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">הכנסות:</span>
-            <span className="font-semibold text-[#22c55e]">₪{totalIncomeCalc.toLocaleString('he-IL')}</span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">הוצאות:</span>
-            <span className="font-semibold text-rose-500">₪{totalExpensesCalc.toLocaleString('he-IL')}</span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">מאזן נטו:</span>
-            <span className={`font-bold px-2 py-0.5 rounded text-xs ${
-              netBalanceCalc >= 0 ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'bg-rose-500/20 text-rose-500'
-            }`}>
-              ₪{netBalanceCalc.toLocaleString('he-IL')}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Main Workspace and Navigation layout */}
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col md:flex-row gap-6">
-        
-        {/* Sidebar Navigation - Desktop only */}
-        <aside className="w-60 shrink-0 hidden md:flex flex-col border-l border-white/10 bg-[#0d0d0d] p-4 gap-1 rounded-2xl h-fit">
-          <div className="text-[10px] font-bold text-gray-500 tracking-widest font-sans uppercase pr-2 mb-3 mt-1">תפריט ניווט עסקי</div>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activePage === item.id;
-              
-              return (
-                <button
-                  id={`side-nav-${item.id}`}
-                  key={item.id}
-                  onClick={() => setActivePage(item.id as ActivePage)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-right transition-all cursor-pointer ${
-                    isActive 
-                      ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-medium' 
-                      : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent transition-colors'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+          {/* nav */}
+          <nav className="relative">
+            {pill && (
+              <div
+                className="absolute inset-x-0 z-0 rounded-2xl bg-white shadow-[0_10px_22px_-10px_rgba(0,0,0,0.5)] transition-[transform,height] duration-500"
+                style={{ transform: `translateY(${pill.top}px)`, height: pill.height, transitionTimingFunction: 'var(--spring)', top: 0 }}
+              />
+            )}
+            {navGroups.map((g) => (
+              <div key={g} className="mb-3">
+                <div className={`h-7 flex items-center text-[10.5px] font-semibold tracking-[0.14em] text-white/50 ${sideCollapsed ? 'justify-center' : 'px-3'}`}>
+                  {sideCollapsed ? <span className="w-5 h-px bg-white/30" /> : g}
+                </div>
+                {navItems
+                  .filter((n) => n.group === g)
+                  .map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activePage === item.id;
+                    return (
+                      <button
+                        id={`side-nav-${item.id}`}
+                        key={item.id}
+                        ref={(el) => {
+                          navRefs.current[item.id] = el;
+                        }}
+                        onClick={() => setActivePage(item.id as ActivePage)}
+                        title={sideCollapsed ? item.label : undefined}
+                        className={`relative z-[1] w-full flex items-center gap-3 h-11 mb-0.5 rounded-2xl text-[14.5px] transition-colors cursor-pointer ${
+                          sideCollapsed ? 'justify-center' : 'px-3.5 text-right'
+                        } ${isActive ? 'text-navy font-bold' : 'text-white/85 hover:bg-white/10 font-medium'}`}
+                      >
+                        <Icon className={`w-[19px] h-[19px] shrink-0 transition-colors ${isActive ? 'text-gold-2' : ''}`} />
+                        {!sideCollapsed && <span className="truncate">{item.label}</span>}
+                      </button>
+                    );
+                  })}
+              </div>
+            ))}
           </nav>
 
-          {/* Quick legal stats / app mode wrapper */}
-          <div className="mt-8 pt-4 border-t border-white/5">
-            <div className="bg-gradient-to-b from-[#1a1a1a] to-transparent p-4 rounded-xl border border-white/5">
-              <p className="text-[10px] uppercase text-gray-500 mb-2 font-black tracking-wider">סטטוס מערכת</p>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${isLiveSupabase ? 'bg-[#22c55e] animate-pulse' : 'bg-amber-450 animate-pulse'}`}></div>
-                <span className="text-xs text-gray-300">
-                  {isLiveSupabase ? 'מסונכרן עם Supabase' : 'מצב הדגמה פעיל'}
-                </span>
+          {/* footer: status + user */}
+          <div className="mt-auto pt-4 space-y-3">
+            {!sideCollapsed && (
+              <div className="rounded-2xl border border-white/15 bg-white/[0.07] px-3.5 py-3">
+                <div className="flex items-center gap-2 text-xs font-medium">
+                  <span className={`w-2 h-2 rounded-full ${isLiveSupabase ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+                  {isLiveSupabase ? 'מחובר ומסונכרן' : 'מצב הדגמה'}
+                </div>
+                <div className="text-[11px] text-white/55 mt-1">הנתונים נשמרים אוטומטית</div>
               </div>
+            )}
+            <div className={`flex items-center gap-2.5 pt-3 border-t border-white/15 ${sideCollapsed ? 'flex-col' : ''}`}>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f6e4b0] to-gold text-navy grid place-items-center font-black text-xs shrink-0 ring-2 ring-white/70">
+                {initials}
+              </div>
+              {!sideCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold truncate" title={currentUser.email}>{currentUser.email}</div>
+                  <div className="text-[11px] text-white/55">מנהל</div>
+                </div>
+              )}
+              <button
+                id="desktop-logout-btn"
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                title="יציאה"
+                aria-label="יציאה"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </aside>
 
-        {/* Dynamic Panel Workspace */}
-        <main className="flex-1 min-w-0">
+        {/* ---------- Light panel ---------- */}
+        <div className="min-w-0 bg-panel md:rounded-[1.9rem] min-h-screen md:min-h-0 flex flex-col shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.7)]">
+          {/* Mobile top bar */}
+          <div className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 px-4 h-16 bg-navy text-white">
+            <div className="flex items-center gap-2.5">
+              <BrandLogo size={36} cutout="#16204f" />
+              <div>
+                <div className="text-sm font-extrabold leading-none">ICE DIAMONDS</div>
+                <div className="text-[10px] text-gold mt-0.5">מערכת ניהול כספים</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button onClick={() => setPaletteOpen(true)} className="p-2 rounded-full hover:bg-white/10 cursor-pointer" aria-label="חיפוש">
+                <Search className="w-5 h-5" />
+              </button>
+              <button
+                id="mob-menu-toggle"
+                onClick={() => setMobileNavOpen(true)}
+                className="p-2 rounded-full hover:bg-white/10 cursor-pointer"
+                title="תפריט"
+                aria-label="תפריט"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 px-4 sm:px-6 lg:px-9 py-5 lg:py-8">
+            {/* Page head + controls */}
+            <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-6">
+              <div key={activePage} className="page-enter">
+                <div>
+                  <h1 className="text-[26px] sm:text-[32px] font-extrabold tracking-tight text-ink leading-tight">{currentNav.label}</h1>
+                  <p className="text-sm text-muted mt-1">{currentNav.desc}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Search / command palette */}
+                <button
+                  onClick={() => setPaletteOpen(true)}
+                  className="hidden md:flex items-center gap-2.5 h-10 w-56 lg:w-64 px-3.5 bg-white border border-line rounded-xl text-sm text-muted hover:border-navy/30 transition-colors cursor-pointer"
+                >
+                  <Search className="w-4 h-4" />
+                  <span className="flex-1 text-right">חיפוש מהיר...</span>
+                  <kbd className="text-[10.5px] font-semibold bg-panel border border-line rounded-md px-1.5 py-0.5" dir="ltr">Ctrl K</kbd>
+                </button>
+
+                {/* Month selector */}
+                <div className="relative flex items-center h-10 bg-white border border-line rounded-xl hover:border-navy/30 transition-colors">
+                  <CalendarDays className="w-4 h-4 text-gold-2 absolute right-3 pointer-events-none" />
+                  <select
+                    id="month-selector-dropdown"
+                    value={activeMonthId}
+                    onChange={(e) => setActiveMonthId(e.target.value)}
+                    className="h-full bg-transparent text-sm font-bold text-ink outline-none cursor-pointer appearance-none pr-9 pl-8"
+                    aria-label="בחירת חודש"
+                  >
+                    {isLoadingMonths ? (
+                      <option>נטען...</option>
+                    ) : (
+                      sortedMonths.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-muted absolute left-2.5 pointer-events-none" />
+                </div>
+
+                <button
+                  id="trigger-add-month-modal"
+                  onClick={() => setIsAddingMonthModal(true)}
+                  className="h-10 w-10 grid place-items-center bg-white border border-line rounded-xl text-navy hover:border-navy/30 hover:bg-gold-soft transition-colors cursor-pointer"
+                  title="הוסף חודש חדש"
+                  aria-label="הוסף חודש חדש"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                <button
+                  id="export-month-excel"
+                  onClick={handleExportMonth}
+                  disabled={isExporting || !activeMonthId}
+                  className="h-10 flex items-center gap-2 px-4 bg-navy hover:bg-navy-2 text-white rounded-xl text-sm font-semibold shadow-lg shadow-navy/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                  title="ייצוא החודש לאקסל"
+                >
+                  <Download className={`w-4 h-4 text-gold ${isExporting ? 'animate-bounce' : ''}`} />
+                  <span className="hidden sm:inline">{isExporting ? 'מייצא...' : 'ייצוא לאקסל'}</span>
+                </button>
+              </div>
+            </header>
+
+            {/* Month KPIs (the dashboard has its own, richer version) */}
+            {activePage !== 'dashboard' && (
+            <section className="grid grid-cols-3 gap-2.5 sm:gap-4 mb-6">
+              <div className="bg-white shadow-card rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3">
+                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 place-items-center shrink-0">
+                  <TrendingUp className="w-5 h-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[11px] sm:text-xs text-muted font-medium">הכנסות החודש</div>
+                  <div className="text-base sm:text-2xl font-extrabold text-emerald-600 truncate">{ils0(totalIncomeCalc)}</div>
+                </div>
+              </div>
+              <div className="bg-white shadow-card rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3">
+                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-rose-50 text-rose-600 place-items-center shrink-0">
+                  <TrendingDown className="w-5 h-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[11px] sm:text-xs text-muted font-medium">הוצאות החודש</div>
+                  <div className="text-base sm:text-2xl font-extrabold text-rose-600 truncate">{ils0(totalExpensesCalc)}</div>
+                </div>
+              </div>
+              <div
+                className="rounded-2xl sm:rounded-3xl p-3 sm:p-5 flex items-center gap-3 text-white"
+                style={{ background: 'linear-gradient(150deg, #24316e, #16204f)' }}
+              >
+                <span className="hidden sm:grid w-11 h-11 rounded-2xl bg-white/10 text-gold place-items-center shrink-0">
+                  <Wallet className="w-5 h-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[11px] sm:text-xs text-white/65 font-medium">מאזן נטו · {activeMonthName}</div>
+                  <div className={`text-base sm:text-2xl font-extrabold truncate ${netBalanceCalc >= 0 ? 'text-[#86efac]' : 'text-[#fda4af]'}`}>
+                    {ils0(netBalanceCalc)}
+                  </div>
+                </div>
+              </div>
+            </section>
+            )}
+
+        {/* Dynamic Panel Workspace — re-keyed so each page / month change plays the entrance */}
+        <main key={`${activePage}-${activeMonthId}`} className="page-enter min-w-0">
           {isLoadingData ? (
-            <div className="bg-[#111] border border-white/10 rounded-2xl p-16 text-center space-y-4 shadow-2xl">
-              <Diamond className="w-10 h-10 animate-spin text-[#22c55e] mx-auto shadow-[0_0_15px_rgba(34,197,94,0.3)]" />
-              <p className="text-gray-400 text-sm font-semibold">הסינכרון הפיננסי מתבצע כעת...</p>
+            <div className="bg-white shadow-card rounded-3xl p-16 text-center space-y-4">
+              <Diamond className="w-10 h-10 animate-spin text-gold mx-auto" />
+              <p className="text-muted text-sm font-semibold">טוען את נתוני החודש...</p>
             </div>
           ) : (
             <>
@@ -728,6 +952,10 @@ export default function App() {
                   employees={employees}
                   employeeMonths={employeeMonths}
                   onOpenEmployees={() => setActivePage('employees')}
+                  months={months}
+                  activeMonthId={activeMonthId}
+                  onNavigate={(p) => setActivePage(p)}
+                  notify={pushToast}
                 />
               )}
 
@@ -791,7 +1019,8 @@ export default function App() {
             </>
           )}
         </main>
-
+          </div>
+        </div>
       </div>
 
       {/* 4. Mobile side drawer navigation (opened via hamburger) */}
@@ -799,69 +1028,78 @@ export default function App() {
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 bg-navy/40 backdrop-blur-sm"
             onClick={() => setMobileNavOpen(false)}
           ></div>
 
           {/* Drawer panel (slides in from the right for RTL) */}
-          <div className="absolute top-0 right-0 h-full w-72 max-w-[82%] bg-[#0d0d0d] border-l border-white/10 shadow-2xl flex flex-col animate-[slideIn_0.2s_ease-out]">
+          <div
+            className="absolute top-0 right-0 h-full w-72 max-w-[82%] text-white flex flex-col animate-[slideIn_0.25s_var(--out)] rounded-l-3xl overflow-hidden"
+            style={{ background: 'linear-gradient(165deg, #2a377a 0%, #1b2660 45%, #16204f 100%)' }}
+          >
             {/* Drawer header */}
-            <div className="flex items-center justify-between px-5 h-16 border-b border-white/10">
+            <div className="flex items-center justify-between px-5 h-20 border-b border-white/10">
               <div className="flex items-center gap-2.5">
-                <BrandLogo size={34} className="shrink-0" />
+                <BrandLogo size={38} cutout="#2a377a" className="shrink-0" />
                 <div className="flex flex-col">
-                  <span className="text-sm font-extrabold text-white leading-none">ICE DIAMONDS</span>
-                  <span className="text-[10px] text-[#22c55e]">מערכת ניהול כספים</span>
+                  <span className="text-sm font-extrabold leading-none">ICE DIAMONDS</span>
+                  <span className="text-[10px] text-gold mt-1">מערכת ניהול כספים</span>
                 </div>
               </div>
               <button
                 id="drawer-close"
                 onClick={() => setMobileNavOpen(false)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-full transition-colors"
+                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                 title="סגור"
+                aria-label="סגור"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Nav items */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activePage === item.id;
-                return (
-                  <button
-                    id={`drawer-nav-${item.id}`}
-                    key={item.id}
-                    onClick={() => {
-                      setActivePage(item.id as ActivePage);
-                      setMobileNavOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm text-right transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 font-semibold'
-                        : 'text-gray-300 hover:text-white hover:bg-white/5 border border-transparent'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
+            {/* Nav items, grouped */}
+            <nav className="flex-1 overflow-y-auto p-4">
+              {navGroups.map((g) => (
+                <div key={g} className="mb-3">
+                  <div className="px-3 h-7 flex items-center text-[10.5px] font-semibold tracking-[0.14em] text-white/50">{g}</div>
+                  {navItems
+                    .filter((n) => n.group === g)
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activePage === item.id;
+                      return (
+                        <button
+                          id={`drawer-nav-${item.id}`}
+                          key={item.id}
+                          onClick={() => {
+                            setActivePage(item.id as ActivePage);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 mb-0.5 rounded-2xl text-[15px] text-right transition-all cursor-pointer ${
+                            isActive ? 'bg-white text-navy font-bold shadow-lg' : 'text-white/85 hover:bg-white/10 font-medium'
+                          }`}
+                        >
+                          <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-gold-2' : ''}`} />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+              ))}
             </nav>
 
             {/* Drawer footer: user + logout */}
             <div className="p-4 border-t border-white/10 space-y-3">
               <div className="flex items-center gap-2.5 px-1">
-                <div className="w-9 h-9 rounded-full bg-[#22c55e] flex items-center justify-center font-black text-black text-xs select-none shrink-0">
-                  {currentUser?.email ? currentUser.email.substring(0, 2).toUpperCase() : 'ID'}
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#f6e4b0] to-gold text-navy flex items-center justify-center font-black text-xs select-none shrink-0">
+                  {initials}
                 </div>
-                <span className="font-mono text-xs text-zinc-400 truncate">{currentUser?.email}</span>
+                <span className="text-xs text-white/70 truncate">{currentUser?.email}</span>
               </div>
               <button
                 id="drawer-logout"
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-gray-300 hover:text-rose-400 bg-[#1a1a1a] hover:bg-rose-950/20 border border-white/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer font-medium"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-white/85 hover:text-white bg-white/10 hover:bg-white/15 rounded-xl transition-all cursor-pointer font-medium"
               >
                 <LogOut className="w-4 h-4" />
                 <span>יציאה מהחשבון</span>
@@ -873,35 +1111,35 @@ export default function App() {
 
       {/* 5. Add Month Modal Popup */}
       {isAddingMonthModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-white/10 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-green-500" />
+        <div className="fixed inset-0 bg-navy/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="pop-in bg-white shadow-pop border border-line p-6 rounded-3xl max-w-sm w-full space-y-4">
+            <h3 className="text-base font-bold text-ink flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-gold-2" />
               הוספת חודש שקיפות חדש
             </h3>
-            <p className="text-xs text-gray-400 leading-snug">
+            <p className="text-xs text-slate-500 leading-snug">
               בחר חודש ושנה. ההוצאות הקבועות יועתקו אוטומטית עם הסכומים שלהן, וההוצאות המשתנות יתחילו ריקות למילוי מחדש.
             </p>
 
             <form onSubmit={handleAddMonthSubmit} className="space-y-4 pt-1">
               {/* Year stepper with arrows */}
               <div className="space-y-1.5">
-                <label className="text-[11px] text-gray-400 font-medium">שנה</label>
-                <div className="flex items-center justify-between bg-[#1a1a1a] border border-white/10 rounded-xl px-2 py-1.5">
+                <label className="text-[11px] text-slate-500 font-medium">שנה</label>
+                <div className="flex items-center justify-between bg-slate-100 border border-line rounded-xl px-2 py-1.5">
                   <button
                     type="button"
                     onClick={() => setNewMonthYear((y) => Math.max(new Date().getFullYear(), y - 1))}
                     disabled={newMonthYear <= new Date().getFullYear()}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-ink hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     title="שנה קודמת"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
-                  <span className="text-lg font-black font-mono text-white select-none">{newMonthYear}</span>
+                  <span className="text-lg font-black font-mono text-ink select-none">{newMonthYear}</span>
                   <button
                     type="button"
                     onClick={() => setNewMonthYear((y) => y + 1)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                    className="p-1.5 rounded-lg text-slate-500 hover:text-ink hover:bg-slate-100 transition-colors"
                     title="שנה הבאה"
                   >
                     <ChevronLeft className="w-5 h-5" />
@@ -911,7 +1149,7 @@ export default function App() {
 
               {/* Month grid picker */}
               <div className="space-y-1.5">
-                <label className="text-[11px] text-gray-400 font-medium">חודש</label>
+                <label className="text-[11px] text-slate-500 font-medium">חודש</label>
                 <div className="grid grid-cols-3 gap-2">
                   {HEBREW_MONTHS.map((name, idx) => {
                     const monthNum = idx + 1;
@@ -928,10 +1166,10 @@ export default function App() {
                         title={alreadyExists ? 'חודש זה כבר קיים' : name}
                         className={`py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 border ${
                           isSelected
-                            ? 'bg-[#22c55e] text-black border-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+                            ? 'bg-navy text-white border-navy shadow-md shadow-navy/20'
                             : alreadyExists
-                            ? 'bg-transparent text-gray-600 border-white/5 cursor-not-allowed line-through'
-                            : 'bg-[#1a1a1a] text-gray-300 border-white/10 hover:border-[#22c55e]/50 hover:text-white cursor-pointer'
+                            ? 'bg-transparent text-slate-400 border-line cursor-not-allowed line-through'
+                            : 'bg-slate-100 text-ink-2 border-line hover:border-navy/30 hover:text-ink cursor-pointer'
                         }`}
                       >
                         {name}
@@ -946,7 +1184,7 @@ export default function App() {
                   id="submit-new-mon"
                   type="submit"
                   disabled={isCreatingMonth}
-                  className="flex-1 bg-[#22c55e] hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-extrabold py-2.5 px-3 rounded-xl text-xs transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:scale-[1.02]"
+                  className="flex-1 bg-navy hover:bg-navy-2 disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold py-2.5 px-3 rounded-xl text-xs transition-all duration-200 cursor-pointer shadow-lg shadow-navy/15 hover:scale-[1.02]"
                 >
                   {isCreatingMonth ? 'יוצר חודש...' : 'הוסף חודש'}
                 </button>
@@ -954,7 +1192,7 @@ export default function App() {
                   id="close-mon-modal"
                   type="button"
                   onClick={() => setIsAddingMonthModal(false)}
-                  className="flex-1 bg-[#1a1a1a] hover:bg-white/5 border border-white/10 py-2.5 px-3 rounded-xl text-gray-400 text-xs text-center transition duration-200 cursor-pointer"
+                  className="flex-1 bg-slate-100 hover:bg-slate-100 border border-line py-2.5 px-3 rounded-xl text-slate-500 text-xs text-center transition duration-200 cursor-pointer"
                 >
                   ביטול
                 </button>
@@ -964,34 +1202,24 @@ export default function App() {
         </div>
       )}
 
-      {/* Styled Footer block from design */}
-      <footer className="hidden md:flex h-10 bg-[#0d0d0d] border-t border-white/10 px-8 items-center justify-between text-[11px] text-gray-500 font-medium mt-auto">
-        <div className="flex gap-4">
-          <span className="hover:text-gray-450 cursor-pointer transition-colors">תנאי שימוש</span>
-          <span className="hover:text-gray-450 cursor-pointer transition-colors">תמיכה בקצה</span>
-          <span className="hover:text-gray-450 cursor-pointer transition-colors">מדיניות פרטיות</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>ICE DIAMONDS © 2026</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse"></div>
-          <span>מערכת פיננסית פעילה ומלוטשת</span>
-        </div>
-      </footer>
+      {/* Ctrl+K palette and undo/status toasts */}
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
 
       {/* Overdue-payment toast (bottom-right, once per load) */}
       {payNotif && payNotif.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[#141414] border border-rose-500/40 rounded-2xl shadow-2xl overflow-hidden animate-[slideIn_0.25s_ease-out]">
-          <div className="flex items-start justify-between gap-3 px-4 py-3 bg-rose-950/30 border-b border-rose-500/20">
+        <div className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-white border border-rose-200 rounded-2xl overflow-hidden animate-[slideIn_0.25s_ease-out]">
+          <div className="flex items-start justify-between gap-3 px-4 py-3 bg-rose-50 border-b border-rose-200">
             <div className="flex items-center gap-2">
               <span className="text-lg">⏰</span>
               <div>
-                <div className="text-sm font-bold text-rose-300">עבר זמן התשלום!</div>
-                <div className="text-[11px] text-gray-400">{payNotif.length} ספקים ממתינים לתשלום</div>
+                <div className="text-sm font-bold text-rose-600">עבר זמן התשלום!</div>
+                <div className="text-[11px] text-slate-500">{payNotif.length} ספקים ממתינים לתשלום</div>
               </div>
             </div>
             <button
               onClick={() => setPayNotif(null)}
-              className="p-1 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-colors shrink-0"
+              className="p-1 text-slate-500 hover:text-ink hover:bg-slate-100 rounded-full transition-colors shrink-0"
               title="סגור"
             >
               <X className="w-4 h-4" />
@@ -999,12 +1227,12 @@ export default function App() {
           </div>
           <div className="max-h-56 overflow-y-auto p-3 space-y-1.5">
             {payNotif.map((v, i) => (
-              <div key={i} className="flex items-center justify-between gap-2 bg-white/5 rounded-lg px-3 py-2">
+              <div key={i} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-base leading-none shrink-0">{v.mood === 'angry' ? '😠' : '😐'}</span>
-                  <span className="text-sm text-gray-200 truncate">{v.name}</span>
+                  <span className="text-sm text-ink truncate">{v.name}</span>
                 </div>
-                <span className="text-xs font-mono font-bold text-rose-400 shrink-0">
+                <span className="text-xs font-mono font-bold text-rose-600 shrink-0">
                   {v.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                 </span>
               </div>

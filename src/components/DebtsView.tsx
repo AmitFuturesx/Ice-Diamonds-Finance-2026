@@ -138,11 +138,11 @@ export default function DebtsView({
   const getStatusBadgeStyles = (status: PaymentStatus) => {
     switch (status) {
       case 'שולם':
-        return 'bg-green-950/40 text-green-400 border border-green-500/30';
+        return 'bg-emerald-50 text-emerald-600 border border-emerald-200';
       case 'שולם חלקית':
-        return 'bg-amber-950/40 text-amber-400 border border-amber-500/30';
+        return 'bg-amber-50 text-amber-700 border border-amber-200';
       case 'לא שולם':
-        return 'bg-red-950/40 text-red-400 border border-red-500/30';
+        return 'bg-rose-50 text-rose-600 border border-rose-200';
     }
   };
 
@@ -159,32 +159,32 @@ export default function DebtsView({
       label: 'סה״כ החזר חודשי',
       amount: totalMonthlyDebtRepayment,
       count: debts.length,
-      activeClasses: 'border-[#22c55e] bg-[#22c55e]/10',
-      accentText: 'text-[#22c55e]'
+      activeClasses: 'border-emerald-400 bg-emerald-50',
+      accentText: 'text-emerald-600'
     },
     {
       key: 'שולם',
       label: 'שולם',
       amount: paidMonthly,
       count: debts.filter((d) => statusOf(d) === 'שולם').length,
-      activeClasses: 'border-green-500 bg-green-500/10',
-      accentText: 'text-green-400'
+      activeClasses: 'border-emerald-500 bg-emerald-50',
+      accentText: 'text-emerald-600'
     },
     {
       key: 'שולם חלקית',
       label: 'שולם חלקית',
       amount: partialMonthly,
       count: debts.filter((d) => statusOf(d) === 'שולם חלקית').length,
-      activeClasses: 'border-amber-500 bg-amber-500/10',
-      accentText: 'text-amber-400'
+      activeClasses: 'border-amber-400 bg-amber-50',
+      accentText: 'text-amber-700'
     },
     {
       key: 'לא שולם',
       label: 'נותר לשלם',
       amount: remainingMonthly,
       count: debts.filter((d) => statusOf(d) === 'לא שולם').length,
-      activeClasses: 'border-red-500 bg-red-500/10',
-      accentText: 'text-red-400'
+      activeClasses: 'border-rose-400 bg-rose-50',
+      accentText: 'text-rose-600'
     }
   ];
 
@@ -192,28 +192,28 @@ export default function DebtsView({
     <div className="space-y-6">
 
       {/* Header Info Dashboard banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 bg-white shadow-card rounded-[1.6rem] overflow-hidden ">
         <div className="p-6 space-y-1">
-          <h2 className="text-xl font-bold text-white">התחייבויות וחובות</h2>
-          <p className="text-xs text-zinc-500">
+          <h2 className="text-xl font-bold text-ink">התחייבויות וחובות</h2>
+          <p className="text-xs text-slate-500">
             מעקב אחר פרעון הלוואות בנקאיות, מימון מכונות וליסינג עסקי
           </p>
-          <div className="pt-2 text-xs text-[#22c55e] font-semibold flex items-center gap-1.5">
+          <div className="pt-2 text-xs text-emerald-600 font-semibold flex items-center gap-1.5">
             <ShieldCheck className="w-4.5 h-4.5" />
             <span>כל הנתונים מעודכנים לתקופת הדו״ח</span>
           </div>
         </div>
 
-        <div className="p-6 bg-zinc-900/30 border-t md:border-t-0 md:border-r border-zinc-800 text-center flex flex-col justify-center">
-          <span className="text-xs text-zinc-500 block">סה״כ החזר חודשי החודש</span>
-          <span className="text-2xl font-black font-mono text-red-400 mt-1">
+        <div className="p-6 bg-slate-50 border-t md:border-t-0 md:border-r border-line text-center flex flex-col justify-center">
+          <span className="text-xs text-slate-500 block">סה״כ החזר חודשי החודש</span>
+          <span className="text-2xl font-black font-mono text-rose-600 mt-1">
             {fmtCurrency(totalMonthlyDebtRepayment)}
           </span>
         </div>
 
-        <div className="p-6 bg-zinc-900/50 border-t md:border-t-0 md:border-r border-zinc-800 text-center flex flex-col justify-center">
-          <span className="text-xs text-zinc-500 block">יתרת חוב כוללת לפירעון</span>
-          <span className="text-2xl font-black font-mono text-[#22c55e] mt-1">
+        <div className="p-6 bg-slate-50 border-t md:border-t-0 md:border-r border-line text-center flex flex-col justify-center">
+          <span className="text-xs text-slate-500 block">יתרת חוב כוללת לפירעון</span>
+          <span className="text-2xl font-black font-mono text-emerald-600 mt-1">
             {fmtCurrency(totalOutstandingBalance)}
           </span>
         </div>
@@ -228,13 +228,11 @@ export default function DebtsView({
               key={card.key}
               id={`debt-filter-card-${card.key}`}
               onClick={() => setStatusFilter(card.key)}
-              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                isActive ? card.activeClasses : 'border-zinc-800 bg-[#121212] hover:border-zinc-700'
-              }`}
+              className={`text-right p-4 rounded-[1.6rem] border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${ isActive ? card.activeClasses : 'border-line bg-white shadow-card hover:border-slate-300' }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
-                <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-full">
+                <span className="text-xs text-slate-500 font-medium">{card.label}</span>
+                <span className="text-[10px] text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded-full">
                   {card.count}
                 </span>
               </div>
@@ -247,12 +245,12 @@ export default function DebtsView({
       </div>
 
       {statusFilter !== 'all' && (
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <span>מסונן לפי: <span className="font-semibold text-white">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>מסונן לפי: <span className="font-semibold text-ink">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
           <button
             id="debt-clear-filter-btn"
             onClick={() => setStatusFilter('all')}
-            className="text-[#22c55e] hover:underline"
+            className="text-emerald-600 hover:underline"
           >
             הצג הכל
           </button>
@@ -260,29 +258,29 @@ export default function DebtsView({
       )}
 
       {/* Repayment Progress overview */}
-      <div className="bg-[#121212] border border-zinc-800 p-5 rounded-2xl">
-        <div className="flex justify-between text-xs text-zinc-400 mb-2 font-medium">
+      <div className="bg-white shadow-card p-5 rounded-[1.6rem]">
+        <div className="flex justify-between text-xs text-slate-500 mb-2 font-medium">
           <span>מדד פירעון חוב גלובלי (כמה סילקנו מסך הקרן המקורית)</span>
-          <span className="text-[#22c55e] font-bold">{globalRepaymentPercent.toFixed(1)}% שולם</span>
+          <span className="text-emerald-600 font-bold">{globalRepaymentPercent.toFixed(1)}% שולם</span>
         </div>
-        <div className="w-full bg-zinc-950 rounded-full h-3 overflow-hidden border border-zinc-800 flex">
+        <div className="w-full bg-white rounded-full h-3 overflow-hidden border border-line flex">
           <div
-            className="bg-green-500 h-full rounded-full transition-all duration-700"
+            className="bg-navy h-full rounded-full transition-all duration-700"
             style={{ width: `${globalRepaymentPercent}%` }}
           ></div>
         </div>
-        <div className="flex justify-between text-[11px] text-zinc-500 mt-1.5 font-mono">
+        <div className="flex justify-between text-[11px] text-slate-500 mt-1.5 font-mono">
           <span>סולק: {totalRepaidAmount.toLocaleString('he-IL')} ₪</span>
           <span>קרן מקורית: {totalOriginalDebt.toLocaleString('he-IL')} ₪</span>
         </div>
       </div>
 
       {/* Debts Table */}
-      <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-white shadow-card rounded-[1.6rem] overflow-hidden ">
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
-              <tr className="border-b border-zinc-800 text-xs text-zinc-400 bg-zinc-900/10">
+              <tr className="border-b border-line text-xs text-slate-500 bg-slate-50/60">
                 <th className="p-4 font-semibold w-1/6">גורם מלווה / ספק</th>
                 <th className="p-4 font-semibold w-[13%]">החזר חודשי</th>
                 <th className="p-4 font-semibold w-[15%]">יתרת חוב נוכחית</th>
@@ -292,10 +290,10 @@ export default function DebtsView({
                 <th className="p-4 font-semibold text-center w-1/12">פעולות</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
+            <tbody className="divide-y divide-line text-sm text-ink-2">
               {visibleDebts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-zinc-600">
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
                     {debts.length === 0
                       ? 'אין חובות או התחייבויות פתוחים לחודש הנבחר.'
                       : 'אין חובות בסטטוס הנבחר.'}
@@ -310,8 +308,8 @@ export default function DebtsView({
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-zinc-900/35 transition-colors duration-200 ${
-                        isEditing ? 'bg-zinc-900/60' : ''
+                      className={`hover:bg-slate-50 transition-colors duration-200 ${
+                        isEditing ? 'bg-slate-50' : ''
                       }`}
                     >
                       {/* Lender Name */}
@@ -322,25 +320,25 @@ export default function DebtsView({
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none focus:border-navy"
                           />
                         ) : (
-                          <span className="font-semibold text-white flex items-center gap-2">
-                            <Landmark className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="font-semibold text-ink flex items-center gap-2">
+                            <Landmark className="w-3.5 h-3.5 text-slate-500" />
                             {item.name}
                           </span>
                         )}
                       </td>
 
                       {/* Monthly Payment */}
-                      <td className="p-4 font-mono text-xs font-semibold text-red-400">
+                      <td className="p-4 font-mono text-xs font-semibold text-rose-600">
                         {isEditing ? (
                           <input
                             id={`edit-debt-monthly-${item.id}`}
                             type="number"
                             value={editMonthlyPayment}
                             onChange={(e) => setEditMonthlyPayment(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none font-mono focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none font-mono focus:border-navy"
                           />
                         ) : (
                           <span>-{Number(item.monthly_payment).toLocaleString('he-IL')} ₪</span>
@@ -355,10 +353,10 @@ export default function DebtsView({
                             type="number"
                             value={editCurrentBalance}
                             onChange={(e) => setEditCurrentBalance(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none font-mono focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none font-mono focus:border-navy"
                           />
                         ) : (
-                          <span className="text-[#22c55e] font-bold">
+                          <span className="text-emerald-600 font-bold">
                             {Number(item.current_balance).toLocaleString('he-IL')} ₪
                           </span>
                         )}
@@ -372,14 +370,14 @@ export default function DebtsView({
                             type="text"
                             value={editPaymentDate}
                             onChange={(e) => setEditPaymentDate(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-20 outline-none text-center focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-20 outline-none text-center focus:border-navy"
                           />
                         ) : (
                           <span
                             className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold ${
                               !item.payment_date || item.payment_date === 'לא סומן'
-                                ? 'bg-zinc-800/60 text-zinc-400 border border-zinc-700'
-                                : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                                ? 'bg-slate-100 text-slate-500 border border-slate-300'
+                                : 'bg-sky-50 text-sky-700 border border-sky-200'
                             }`}
                           >
                             <CalendarClock className="w-3.5 h-3.5" />
@@ -397,7 +395,7 @@ export default function DebtsView({
                             id={`edit-debt-status-${item.id}`}
                             value={editStatus}
                             onChange={(e) => setEditStatus(e.target.value as PaymentStatus)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-xs text-ink outline-none focus:border-navy"
                           >
                             <option value="שולם">שולם</option>
                             <option value="שולם חלקית">שולם חלקית</option>
@@ -418,13 +416,13 @@ export default function DebtsView({
                       {/* Progress visual */}
                       <td className="p-4">
                         <div className="space-y-1">
-                          <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                          <div className="w-full bg-slate-50 rounded-full h-1.5 overflow-hidden">
                             <div
-                              className="bg-green-500 h-full rounded-full transition-all duration-300"
+                              className="bg-navy h-full rounded-full transition-all duration-300"
                               style={{ width: `${repaidPercent}%` }}
                             ></div>
                           </div>
-                          <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                          <div className="flex justify-between text-[10px] text-slate-500 font-mono">
                             <span>{repaidPercent.toFixed(0)}% סולק</span>
                             <span>נותר: {(item.current_balance || 0).toLocaleString()}</span>
                           </div>
@@ -433,8 +431,8 @@ export default function DebtsView({
                               <span
                                 className={`inline-block px-2 py-0.5 rounded-md text-[11px] font-bold ${
                                   remainingPayments(item) === 0
-                                    ? 'bg-green-950/40 text-green-400 border border-green-500/30'
-                                    : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                    : 'bg-sky-50 text-sky-700 border border-sky-200'
                                 }`}
                               >
                                 {remainingPaymentsLabel(remainingPayments(item))}
@@ -452,7 +450,7 @@ export default function DebtsView({
                               <button
                                 id={`save-debt-${item.id}`}
                                 onClick={() => handleSaveEdit(item.id, item.original_amount)}
-                                className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
+                                className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors"
                                 title="שמור"
                               >
                                 <Check className="w-4 h-4" />
@@ -460,7 +458,7 @@ export default function DebtsView({
                               <button
                                 id={`cancel-debt-${item.id}`}
                                 onClick={cancelEdit}
-                                className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                                className="p-1.5 hover:bg-slate-100 text-slate-500 rounded transition-colors"
                                 title="בטל"
                               >
                                 <X className="w-4 h-4" />
@@ -471,7 +469,7 @@ export default function DebtsView({
                               <button
                                 id={`edit-debt-${item.id}`}
                                 onClick={() => startEdit(item)}
-                                className="p-1.5 hover:bg-zinc-800 hover:text-[#22c55e] text-zinc-500 rounded transition-colors"
+                                className="p-1.5 hover:bg-slate-100 hover:text-navy text-slate-500 rounded transition-colors"
                                 title="ערוך"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -479,7 +477,7 @@ export default function DebtsView({
                               <button
                                 id={`delete-debt-${item.id}`}
                                 onClick={() => onDeleteDebt(item.id)}
-                                className="p-1.5 hover:bg-red-950/40 hover:text-red-400 text-zinc-500 rounded transition-colors"
+                                className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded transition-colors"
                                 title="מחק"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -498,15 +496,15 @@ export default function DebtsView({
       </div>
 
       {/* Add New Debt Form Box */}
-      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
-        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <Plus className="w-5 h-5 text-[#22c55e]" />
+      <div className="bg-white shadow-card p-6 rounded-[1.6rem]">
+        <h3 className="text-base font-bold text-ink mb-4 flex items-center gap-2">
+          <Plus className="w-5 h-5 text-emerald-600" />
           הוספת התחייבות / הלוואה חדשה
         </h3>
 
         <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">גורם מממן / ספק ההלוואה *</label>
+            <label className="text-xs text-slate-500 font-medium">גורם מממן / ספק ההלוואה *</label>
             <input
               id="new-debt-name"
               type="text"
@@ -514,12 +512,12 @@ export default function DebtsView({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="לדוג׳ בנק דיסקונט, ליסינג כלי עבודה..."
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">החזר חודשי (₪) *</label>
+            <label className="text-xs text-slate-500 font-medium">החזר חודשי (₪) *</label>
             <input
               id="new-debt-monthly"
               type="number"
@@ -527,12 +525,12 @@ export default function DebtsView({
               value={newMonthlyPayment}
               onChange={(e) => setNewMonthlyPayment(e.target.value)}
               placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink font-mono focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">יתרת חוב נוכחית (₪) *</label>
+            <label className="text-xs text-slate-500 font-medium">יתרת חוב נוכחית (₪) *</label>
             <input
               id="new-debt-balance"
               type="number"
@@ -540,17 +538,17 @@ export default function DebtsView({
               value={newCurrentBalance}
               onChange={(e) => setNewCurrentBalance(e.target.value)}
               placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink font-mono focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">סטטוס</label>
+            <label className="text-xs text-slate-500 font-medium">סטטוס</label>
             <select
               id="new-debt-status"
               value={newStatus}
               onChange={(e) => setNewStatus(e.target.value as PaymentStatus)}
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-3 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-3 py-2.5 text-sm text-ink focus:border-navy"
             >
               <option value="לא שולם">לא שולם</option>
               <option value="שולם חלקית">שולם חלקית</option>
@@ -560,21 +558,21 @@ export default function DebtsView({
 
           <div className="flex gap-2">
             <div className="space-y-1 flex-grow">
-              <label className="text-xs text-zinc-400 font-medium">יום חיוב (1-31)</label>
+              <label className="text-xs text-slate-500 font-medium">יום חיוב (1-31)</label>
               <input
                 id="new-debt-paydate"
                 type="text"
                 value={newPaymentDate}
                 onChange={(e) => setNewPaymentDate(e.target.value)}
                 placeholder="לדוג׳ 10"
-                className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-3 py-2.5 text-sm text-white focus:border-green-500 text-center"
+                className="w-full bg-slate-50 border border-line outline-none rounded-xl px-3 py-2.5 text-sm text-ink focus:border-navy text-center"
               />
             </div>
 
             <button
               id="add-debt-btn"
               type="submit"
-              className="bg-green-500 hover:bg-green-600 text-black font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-green-500/10"
+              className="bg-navy hover:bg-navy-2 text-white font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-navy/15"
               title="הוסף הלוואה"
             >
               <Plus className="w-5 h-5" />

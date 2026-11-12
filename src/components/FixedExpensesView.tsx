@@ -43,9 +43,9 @@ export default function FixedExpensesView({
 
   // Vendor patience mood config
   const MOODS: Record<string, { emoji: string; label: string; cls: string }> = {
-    happy: { emoji: '😊', label: 'רגוע', cls: 'bg-green-950/40 text-green-400 border-green-500/30' },
-    neutral: { emoji: '😐', label: 'העיר על זה', cls: 'bg-amber-950/40 text-amber-400 border-amber-500/30' },
-    angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-red-950/40 text-red-400 border-red-500/30' }
+    happy: { emoji: '😊', label: 'רגוע', cls: 'bg-emerald-50 text-emerald-600 border-emerald-200' },
+    neutral: { emoji: '😐', label: 'העיר על זה', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+    angry: { emoji: '😠', label: 'דורש את הכסף', cls: 'bg-rose-50 text-rose-600 border-rose-200' }
   };
   const nextMood = (m: string) => (m === 'happy' ? 'neutral' : m === 'neutral' ? 'angry' : 'happy');
 
@@ -182,11 +182,11 @@ export default function FixedExpensesView({
   const getStatusBadgeStyles = (status: PaymentStatus) => {
     switch (status) {
       case 'שולם':
-        return 'bg-green-950/40 text-green-400 border border-green-500/30';
+        return 'bg-emerald-50 text-emerald-600 border border-emerald-200';
       case 'שולם חלקית':
-        return 'bg-amber-950/40 text-amber-400 border border-amber-500/30';
+        return 'bg-amber-50 text-amber-700 border border-amber-200';
       case 'לא שולם':
-        return 'bg-red-950/40 text-red-400 border border-red-500/30';
+        return 'bg-rose-50 text-rose-600 border border-rose-200';
     }
   };
 
@@ -203,32 +203,32 @@ export default function FixedExpensesView({
       label: 'סה״כ הכל',
       amount: totalFixed,
       count: expenses.length,
-      activeClasses: 'border-[#22c55e] bg-[#22c55e]/10',
-      accentText: 'text-[#22c55e]'
+      activeClasses: 'border-emerald-400 bg-emerald-50',
+      accentText: 'text-emerald-600'
     },
     {
       key: 'שולם',
       label: 'שולם',
       amount: paidTotal,
       count: expenses.filter((e) => e.status === 'שולם').length,
-      activeClasses: 'border-green-500 bg-green-500/10',
-      accentText: 'text-green-400'
+      activeClasses: 'border-emerald-500 bg-emerald-50',
+      accentText: 'text-emerald-600'
     },
     {
       key: 'שולם חלקית',
       label: 'שולם חלקית',
       amount: partialTotal,
       count: expenses.filter((e) => e.status === 'שולם חלקית').length,
-      activeClasses: 'border-amber-500 bg-amber-500/10',
-      accentText: 'text-amber-400'
+      activeClasses: 'border-amber-400 bg-amber-50',
+      accentText: 'text-amber-700'
     },
     {
       key: 'לא שולם',
       label: 'נותר לשלם',
       amount: remainingTotal,
       count: expenses.filter((e) => e.status === 'לא שולם').length,
-      activeClasses: 'border-red-500 bg-red-500/10',
-      accentText: 'text-red-400'
+      activeClasses: 'border-rose-400 bg-rose-50',
+      accentText: 'text-rose-600'
     }
   ];
 
@@ -236,9 +236,9 @@ export default function FixedExpensesView({
     <div className="space-y-6">
 
       {/* Header */}
-      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
-        <h2 className="text-xl font-bold text-white">הוצאות קבועות</h2>
-        <p className="text-sm text-zinc-500 mt-1">
+      <div className="bg-white shadow-card p-6 rounded-[1.6rem]">
+        <h2 className="text-xl font-bold text-ink">הוצאות קבועות</h2>
+        <p className="text-sm text-slate-500 mt-1">
           מעקב אחר תשלומים גבוהים בעלי מחזור קבוע (שכירות, ארנונה, תקשורת וכדומה)
         </p>
       </div>
@@ -252,13 +252,11 @@ export default function FixedExpensesView({
               key={card.key}
               id={`fixed-filter-card-${card.key}`}
               onClick={() => setStatusFilter(card.key)}
-              className={`text-right p-4 rounded-2xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                isActive ? card.activeClasses : 'border-zinc-800 bg-[#121212] hover:border-zinc-700'
-              }`}
+              className={`text-right p-4 rounded-[1.6rem] border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${ isActive ? card.activeClasses : 'border-line bg-white shadow-card hover:border-slate-300' }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
-                <span className="text-[10px] text-zinc-500 bg-zinc-900 px-1.5 py-0.5 rounded-full">
+                <span className="text-xs text-slate-500 font-medium">{card.label}</span>
+                <span className="text-[10px] text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded-full">
                   {card.count}
                 </span>
               </div>
@@ -271,12 +269,12 @@ export default function FixedExpensesView({
       </div>
 
       {statusFilter !== 'all' && (
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <span>מסונן לפי: <span className="font-semibold text-white">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>מסונן לפי: <span className="font-semibold text-ink">{summaryCards.find((c) => c.key === statusFilter)?.label}</span></span>
           <button
             id="fixed-clear-filter-btn"
             onClick={() => setStatusFilter('all')}
-            className="text-[#22c55e] hover:underline"
+            className="text-emerald-600 hover:underline"
           >
             הצג הכל
           </button>
@@ -284,9 +282,9 @@ export default function FixedExpensesView({
       )}
 
       {/* Payment schedule by billing day (fixed only) */}
-      <div className="bg-[#121212] border border-zinc-800 rounded-2xl p-5">
-        <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-          <CalendarClock className="w-4 h-4 text-sky-300" />
+      <div className="bg-white shadow-card rounded-[1.6rem] p-5">
+        <h4 className="text-sm font-bold text-ink mb-3 flex items-center gap-2">
+          <CalendarClock className="w-4 h-4 text-sky-700" />
           כמה לשלם בכל תאריך — הוצאות קבועות
         </h4>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -295,19 +293,19 @@ export default function FixedExpensesView({
               key={card.key}
               onClick={() => setOpenDay(card.key)}
               className={`text-right p-3.5 rounded-xl border transition-all duration-200 cursor-pointer hover:scale-[1.02] ${
-                card.key === 'unknown' ? 'bg-zinc-800/30 border-zinc-700 hover:border-zinc-500' : 'bg-sky-950/30 border-sky-500/30 hover:border-sky-400'
+                card.key === 'unknown' ? 'bg-slate-100 border-slate-300 hover:border-slate-400' : 'bg-sky-50 border-sky-200 hover:border-sky-400'
               }`}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-zinc-400 font-medium">{card.label}</span>
-                <span className="text-[9px] text-zinc-500 bg-black/30 px-1.5 py-0.5 rounded-full">לחץ</span>
+                <span className="text-xs text-slate-500 font-medium">{card.label}</span>
+                <span className="text-[9px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full">לחץ</span>
               </div>
-              <span className={`text-lg font-black font-mono block ${card.key === 'unknown' ? 'text-zinc-300' : 'text-sky-300'}`}>
+              <span className={`text-lg font-black font-mono block ${card.key === 'unknown' ? 'text-ink-2' : 'text-sky-700'}`}>
                 {card.amount.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
               </span>
-              <div className="mt-1.5 pt-1.5 border-t border-zinc-800 flex items-center justify-between">
-                <span className="text-[10px] text-zinc-500">נותר</span>
-                <span className={`text-xs font-bold font-mono ${card.remaining > 0 ? 'text-rose-400' : 'text-[#22c55e]'}`}>
+              <div className="mt-1.5 pt-1.5 border-t border-line flex items-center justify-between">
+                <span className="text-[10px] text-slate-500">נותר</span>
+                <span className={`text-xs font-bold font-mono ${card.remaining > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                   {card.remaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                 </span>
               </div>
@@ -319,38 +317,38 @@ export default function FixedExpensesView({
       {/* Billing-day popup: who still needs to be paid (fixed) + patience level */}
       {openDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setOpenDay(null)}></div>
-          <div className="relative bg-[#121212] border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div className="absolute inset-0 bg-navy/40 backdrop-blur-sm" onClick={() => setOpenDay(null)}></div>
+          <div className="relative bg-white shadow-card rounded-[1.6rem] w-full max-w-lg max-h-[85vh] flex flex-col ">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <CalendarClock className="w-5 h-5 text-sky-300" />
+                <h3 className="text-base font-bold text-ink flex items-center gap-2">
+                  <CalendarClock className="w-5 h-5 text-sky-700" />
                   למי נותר לשלם — {openDayLabel}
                 </h3>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  הוצאות קבועות · סה״כ נותר: <span className="text-rose-400 font-bold font-mono">
+                <p className="text-xs text-slate-500 mt-0.5">
+                  הוצאות קבועות · סה״כ נותר: <span className="text-rose-600 font-bold font-mono">
                     {openDayRemaining.toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                   </span>
                 </p>
               </div>
-              <button onClick={() => setOpenDay(null)} className="p-2 text-zinc-400 hover:text-white hover:bg-white/5 rounded-full transition-colors" title="סגור">
+              <button onClick={() => setOpenDay(null)} className="p-2 text-slate-500 hover:text-ink hover:bg-slate-100 rounded-full transition-colors" title="סגור">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2.5">
               {openDayItems.length === 0 ? (
-                <div className="py-10 text-center text-[#22c55e] text-sm font-semibold">🎉 הכול שולם לתאריך הזה!</div>
+                <div className="py-10 text-center text-emerald-600 text-sm font-semibold">🎉 הכול שולם לתאריך הזה!</div>
               ) : (
                 openDayItems.map((e) => {
                   const mood = MOODS[e.mood || 'happy'] || MOODS.happy;
                   return (
-                    <div key={e.id} className="flex items-center justify-between gap-3 bg-white/5 border border-white/5 rounded-xl px-4 py-3">
+                    <div key={e.id} className="flex items-center justify-between gap-3 bg-slate-50 border border-line rounded-xl px-4 py-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-white truncate">{e.name}</div>
-                        <div className="text-xs text-zinc-500">{e.status === 'שולם חלקית' ? 'שולם חלקית' : 'לא שולם'}</div>
+                        <div className="text-sm font-semibold text-ink truncate">{e.name}</div>
+                        <div className="text-xs text-slate-500">{e.status === 'שולם חלקית' ? 'שולם חלקית' : 'לא שולם'}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="font-mono font-bold text-rose-400 text-sm">
+                        <span className="font-mono font-bold text-rose-600 text-sm">
                           {(Number(e.amount) || 0).toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 })}
                         </span>
                         <button
@@ -367,25 +365,25 @@ export default function FixedExpensesView({
                 })
               )}
             </div>
-            <div className="px-5 py-3 border-t border-zinc-800 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-400">
+            <div className="px-5 py-3 border-t border-line flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
               <span>😊 רגוע</span><span>😐 העיר על זה</span><span>😠 דורש את הכסף</span>
-              <span className="text-zinc-600">· לחץ על הפרצוף לעדכון</span>
+              <span className="text-slate-400">· לחץ על הפרצוף לעדכון</span>
             </div>
           </div>
         </div>
       )}
 
       {/* Main Table */}
-      <div className="bg-[#121212] border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="p-4 bg-zinc-900/30 border-b border-zinc-800/80 flex justify-between items-center">
-          <span className="text-xs font-bold text-zinc-300 tracking-wider">טבלת הוצאות קבועות</span>
-          <span className="text-xs text-zinc-500">לחץ על תג הסטטוס או יום החיוב כדי לשנותם</span>
+      <div className="bg-white shadow-card rounded-[1.6rem] overflow-hidden ">
+        <div className="p-4 bg-slate-50 border-b border-line flex justify-between items-center">
+          <span className="text-xs font-bold text-ink-2 tracking-wider">טבלת הוצאות קבועות</span>
+          <span className="text-xs text-slate-500">לחץ על תג הסטטוס או יום החיוב כדי לשנותם</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-right border-collapse">
             <thead>
-              <tr className="border-b border-zinc-800 text-xs text-zinc-400 bg-zinc-900/10">
+              <tr className="border-b border-line text-xs text-slate-500 bg-slate-50/60">
                 <th className="p-4 font-semibold text-center w-[15%]">יום חיוב</th>
                 <th className="p-4 font-semibold w-1/4">שם ההוצאה</th>
                 <th className="p-4 font-semibold w-1/6">סכום</th>
@@ -394,10 +392,10 @@ export default function FixedExpensesView({
                 <th className="p-4 font-semibold text-center w-[10%]">פעולות</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 text-sm text-zinc-300">
+            <tbody className="divide-y divide-line text-sm text-ink-2">
               {visibleExpenses.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-zinc-600">
+                  <td colSpan={6} className="p-8 text-center text-slate-400">
                     {expenses.length === 0
                       ? 'אין הוצאות קבועות רשומות לחודש הנבחר.'
                       : 'אין הוצאות בסטטוס הנבחר.'}
@@ -411,8 +409,8 @@ export default function FixedExpensesView({
                   return (
                     <tr
                       key={exp.id}
-                      className={`hover:bg-zinc-900/35 transition-colors duration-200 ${
-                        isEditing ? 'bg-zinc-900/60' : ''
+                      className={`hover:bg-slate-50 transition-colors duration-200 ${
+                        isEditing ? 'bg-slate-50' : ''
                       }`}
                     >
                       {/* Billing Day Col (clickable cycle) */}
@@ -423,8 +421,8 @@ export default function FixedExpensesView({
                           title="לחץ לשינוי יום החיוב"
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer select-none transition-all duration-300 hover:scale-105 active:scale-95 ${
                             billingDay === 'unknown'
-                              ? 'bg-zinc-800/60 text-zinc-400 border border-zinc-700'
-                              : 'bg-sky-950/40 text-sky-300 border border-sky-500/30'
+                              ? 'bg-slate-100 text-slate-500 border border-slate-300'
+                              : 'bg-sky-50 text-sky-700 border border-sky-200'
                           }`}
                         >
                           <CalendarClock className="w-3.5 h-3.5" />
@@ -440,10 +438,10 @@ export default function FixedExpensesView({
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none focus:border-navy"
                           />
                         ) : (
-                          <span className="font-medium text-white">{exp.name}</span>
+                          <span className="font-medium text-ink">{exp.name}</span>
                         )}
                       </td>
 
@@ -455,17 +453,17 @@ export default function FixedExpensesView({
                             type="number"
                             value={editAmount}
                             onChange={(e) => setEditAmount(e.target.value)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none font-mono focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none font-mono focus:border-navy"
                           />
                         ) : (
-                          <span className="font-semibold text-zinc-200">
+                          <span className="font-semibold text-ink">
                             {fmtCurrency(Number(exp.amount))}
                           </span>
                         )}
                       </td>
 
                       {/* Notes Col */}
-                      <td className="p-4 text-zinc-400">
+                      <td className="p-4 text-slate-500">
                         {isEditing ? (
                           <input
                             id={`edit-notes-${exp.id}`}
@@ -473,7 +471,7 @@ export default function FixedExpensesView({
                             value={editNotes}
                             onChange={(e) => setEditNotes(e.target.value)}
                             placeholder="הערות..."
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-sm text-white w-full outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-sm text-ink w-full outline-none focus:border-navy"
                           />
                         ) : (
                           <span>{exp.notes || '—'}</span>
@@ -487,7 +485,7 @@ export default function FixedExpensesView({
                             id={`edit-status-${exp.id}`}
                             value={editStatus}
                             onChange={(e) => setEditStatus(e.target.value as PaymentStatus)}
-                            className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1.5 text-xs text-white outline-none focus:border-green-500"
+                            className="bg-white border border-line rounded px-2.5 py-1.5 text-xs text-ink outline-none focus:border-navy"
                           >
                             <option value="שולם">שולם</option>
                             <option value="שולם חלקית">שולם חלקית</option>
@@ -513,7 +511,7 @@ export default function FixedExpensesView({
                               <button
                                 id={`save-btn-${exp.id}`}
                                 onClick={() => handleSaveEdit(exp.id, exp.payment_date)}
-                                className="p-1.5 hover:bg-green-950/40 text-green-400 rounded transition-colors"
+                                className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors"
                                 title="שמור שינויים"
                               >
                                 <Check className="w-4 h-4" />
@@ -521,7 +519,7 @@ export default function FixedExpensesView({
                               <button
                                 id={`cancel-btn-${exp.id}`}
                                 onClick={cancelEdit}
-                                className="p-1.5 hover:bg-zinc-800 text-zinc-400 rounded transition-colors"
+                                className="p-1.5 hover:bg-slate-100 text-slate-500 rounded transition-colors"
                                 title="בטל"
                               >
                                 <X className="w-4 h-4" />
@@ -532,7 +530,7 @@ export default function FixedExpensesView({
                               <button
                                 id={`edit-trigger-${exp.id}`}
                                 onClick={() => startEdit(exp)}
-                                className="p-1.5 hover:bg-zinc-800 hover:text-[#22c55e] text-zinc-500 rounded transition-colors"
+                                className="p-1.5 hover:bg-slate-100 hover:text-navy text-slate-500 rounded transition-colors"
                                 title="ערוך שורה"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -540,7 +538,7 @@ export default function FixedExpensesView({
                               <button
                                 id={`delete-btn-${exp.id}`}
                                 onClick={() => onDeleteExpense(exp.id)}
-                                className="p-1.5 hover:bg-red-950/40 hover:text-red-400 text-zinc-500 rounded transition-colors"
+                                className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-slate-500 rounded transition-colors"
                                 title="מחק שורה"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -559,16 +557,16 @@ export default function FixedExpensesView({
       </div>
 
       {/* Add New Row Form Box */}
-      <div className="bg-[#121212] border border-zinc-800 p-6 rounded-2xl">
-        <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <Plus className="w-5 h-5 text-[#22c55e]" />
+      <div className="bg-white shadow-card p-6 rounded-[1.6rem]">
+        <h3 className="text-base font-bold text-ink mb-4 flex items-center gap-2">
+          <Plus className="w-5 h-5 text-emerald-600" />
           הוספת שורה חדשה להוצאות הקבועות
         </h3>
 
         <form onSubmit={handleAddNew} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
           {/* Billing Day selector */}
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">יום חיוב *</label>
+            <label className="text-xs text-slate-500 font-medium">יום חיוב *</label>
             <div className="flex gap-1.5">
               {BILLING_OPTIONS.map((day) => (
                 <button
@@ -578,8 +576,8 @@ export default function FixedExpensesView({
                   onClick={() => setNewBillingDay(day)}
                   className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer border ${
                     newBillingDay === day
-                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/50'
-                      : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                      ? 'bg-sky-100 text-sky-700 border-sky-400'
+                      : 'bg-slate-50 text-slate-500 border-line hover:border-slate-300'
                   }`}
                 >
                   {day === 'unknown' ? 'לא ידוע' : day}
@@ -589,7 +587,7 @@ export default function FixedExpensesView({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">שם ההוצאה *</label>
+            <label className="text-xs text-slate-500 font-medium">שם ההוצאה *</label>
             <input
               id="new-fixed-name"
               type="text"
@@ -597,12 +595,12 @@ export default function FixedExpensesView({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="לדוג׳ שכירות משרד, ביטוח חודשי..."
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">סכום בשקלים (₪) *</label>
+            <label className="text-xs text-slate-500 font-medium">סכום בשקלים (₪) *</label>
             <input
               id="new-fixed-amount"
               type="number"
@@ -610,30 +608,30 @@ export default function FixedExpensesView({
               value={newAmount}
               onChange={(e) => setNewAmount(e.target.value)}
               placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink font-mono focus:border-navy"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-zinc-400 font-medium">הערות / פירוט</label>
+            <label className="text-xs text-slate-500 font-medium">הערות / פירוט</label>
             <input
               id="new-fixed-notes"
               type="text"
               value={newNotes}
               onChange={(e) => setNewNotes(e.target.value)}
               placeholder="מידע נוסף..."
-              className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-4 py-2.5 text-sm text-white focus:border-green-500"
+              className="w-full bg-slate-50 border border-line outline-none rounded-xl px-4 py-2.5 text-sm text-ink focus:border-navy"
             />
           </div>
 
           <div className="flex gap-2">
             <div className="space-y-1 flex-1">
-              <label className="text-xs text-zinc-400 font-medium">סטטוס ראשוני</label>
+              <label className="text-xs text-slate-500 font-medium">סטטוס ראשוני</label>
               <select
                 id="new-fixed-status"
                 value={newStatus}
                 onChange={(e) => setNewStatus(e.target.value as PaymentStatus)}
-                className="w-full bg-zinc-900 border border-zinc-800 outline-none rounded-xl px-3 py-2.5 text-sm text-white focus:border-green-500"
+                className="w-full bg-slate-50 border border-line outline-none rounded-xl px-3 py-2.5 text-sm text-ink focus:border-navy"
               >
                 <option value="לא שולם">לא שולם</option>
                 <option value="שולם חלקית">שולם חלקית</option>
@@ -644,7 +642,7 @@ export default function FixedExpensesView({
             <button
               id="add-fixed-btn"
               type="submit"
-              className="bg-green-500 hover:bg-green-600 text-black font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-green-500/10"
+              className="bg-navy hover:bg-navy-2 text-white font-bold h-[42px] px-4 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer text-sm shrink-0 shadow-lg shadow-navy/15"
               title="הוסף שורה"
             >
               <Plus className="w-5 h-5" />
