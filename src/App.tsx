@@ -17,7 +17,7 @@ import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
 import DashboardView from './components/DashboardView';
 import ExpensesPage from './pages/ExpensesPage';
-import DebtsView from './components/DebtsView';
+import DebtsPage from './pages/DebtsPage';
 import IncomeView from './components/IncomeView';
 import DeliveriesView from './components/DeliveriesView';
 import EmployeesView from './components/EmployeesView';
@@ -943,11 +943,14 @@ export default function App() {
               )}
 
               {activePage === 'debts' && (
-                <DebtsView 
+                <DebtsPage
                   debts={debts}
                   activeMonthId={activeMonthId}
+                  monthYear={activeMonthObject?.year}
+                  monthNumber={activeMonthObject?.month_number}
                   onSaveDebt={handleSaveDebt}
                   onDeleteDebt={handleDeleteDebt}
+                  notify={pushToast}
                 />
               )}
 
