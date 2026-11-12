@@ -25,7 +25,7 @@
   white-space: nowrap;
 }
 .cus-company small {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -41,7 +41,7 @@
   width: 1.6rem;
   height: 1.6rem;
   flex: none;
-  font-size: 0.6rem;
+  font-size: 0.82rem;
 }
 .cus-bulk-x {
   color: #fff;
@@ -85,7 +85,7 @@
   place-items: center;
   border-radius: 0.55rem;
   background: #f0f4f5;
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 700;
   color: var(--ink-2);
 }
@@ -141,7 +141,7 @@
   letter-spacing: -0.01em;
 }
 .usr-dh h3 small {
-  font-size: 0.75rem;
+  font-size: 0.88rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -182,7 +182,7 @@
   background: #f4f7f8;
 }
 .cus-facts span {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -216,7 +216,7 @@
   border-radius: 99px;
   background: var(--teal-soft);
   color: var(--teal);
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 600;
 }
 .cus-tag .icon {
@@ -239,7 +239,7 @@
 }
 .cus-sec-head span {
   flex: 1;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   color: var(--muted);
 }
 .cus-deals {
@@ -341,7 +341,7 @@
   color: var(--ink-2);
 }
 .cus-timeline em {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-style: normal;
   color: var(--muted);
 }
@@ -393,7 +393,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   font-weight: 500;
   color: var(--ink-2);
 }
@@ -452,7 +452,7 @@
   padding: 0 0.35rem;
   border-radius: 99px;
   background: #e9eff1;
-  font-size: 0.68rem;
+  font-size: 0.852rem;
   font-style: normal;
   font-weight: 700;
   line-height: 1.35rem;
@@ -460,7 +460,7 @@
 }
 .dl-col-head span {
   margin-inline-start: auto;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 700;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
@@ -529,7 +529,7 @@
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -537,7 +537,7 @@
   width: 1.45rem;
   height: 1.45rem;
   flex: none;
-  font-size: 0.55rem;
+  font-size: 0.8rem;
 }
 .dl-card-value {
   display: flex;
@@ -550,7 +550,7 @@
   font-variant-numeric: tabular-nums;
 }
 .dl-card-value span {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 700;
   color: var(--muted);
 }
@@ -573,7 +573,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -589,7 +589,7 @@
 .dl-card-foot .avatar {
   width: 1.6rem;
   height: 1.6rem;
-  font-size: 0.55rem;
+  font-size: 0.8rem;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px var(--line);
 }
@@ -599,7 +599,7 @@
   min-height: 4.5rem;
   border: 1.5px dashed #cdd8dc;
   border-radius: 1rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -610,7 +610,7 @@
   gap: 0.35rem;
   padding: 0.55rem;
   border-radius: 0.85rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   font-weight: 600;
   color: var(--muted);
   transition:
@@ -641,7 +641,7 @@
   border-radius: 99px;
   background: color-mix(in srgb, var(--c) 14%, #fff);
   color: color-mix(in srgb, var(--c) 75%, #1c2a33);
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 600;
 }
 .dl-stage-chip i {
@@ -654,7 +654,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 700;
 }
 .dl-list-prob .dl-prob {
@@ -693,7 +693,7 @@
   gap: 0.45rem;
   padding: 0.5rem 0.2rem;
   border-radius: 0.85rem;
-  font-size: 0.66rem;
+  font-size: 0.844rem;
   font-weight: 600;
   color: var(--muted);
   transition:
@@ -794,7 +794,7 @@
 .usr-avatar .avatar {
   width: 2.3rem;
   height: 2.3rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
 }
 .usr-dh-avatar .avatar {
   width: 4.2rem;
@@ -829,7 +829,7 @@
   border-radius: 99px;
   background: var(--green-soft);
   color: var(--green-3);
-  font-size: 0.62rem;
+  font-size: 0.828rem;
   font-weight: 700;
   vertical-align: middle;
 }
@@ -840,7 +840,7 @@
   box-shadow: none;
   border: 1.5px solid var(--line);
   background: #fff;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
 }
 .usr-role .select-btn:hover,
 .usr-role .select-btn.is-open {
@@ -851,7 +851,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -887,7 +887,7 @@
   padding: 0.55rem 0.7rem;
   border-radius: 0.85rem;
   background: #f6f9f9;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -921,7 +921,7 @@
 .usr-mx-head {
   align-items: end;
   padding-bottom: 0.7rem;
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -932,7 +932,7 @@
   gap: 0.25rem;
 }
 .usr-mx-head small {
-  font-size: 0.66rem;
+  font-size: 0.844rem;
   font-weight: 500;
 }
 .usr-mx-label {
@@ -982,7 +982,7 @@
 }
 .usr-audit em {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-style: normal;
   color: var(--muted);
 }
@@ -1008,6 +1008,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .dl-stepper button {
-    font-size: 0.58rem;
+    font-size: 0.812rem;
   }
 }

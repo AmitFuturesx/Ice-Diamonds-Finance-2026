@@ -147,7 +147,7 @@
 .notif-text em {
   display: block;
   margin-top: 0.15rem;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-style: normal;
   color: var(--muted);
 }
@@ -182,7 +182,7 @@
 .seg button {
   padding: 0.45rem 0.3rem;
   border-radius: 0.65rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 600;
   text-align: center;
   color: var(--ink-2);
@@ -254,7 +254,7 @@
   font-size: 0.88rem;
 }
 .pop-user span {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   color: var(--muted);
 }
 
@@ -347,7 +347,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -381,7 +381,7 @@
   background: #f4f7f8;
 }
 .fd-stats span:first-child {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -441,7 +441,7 @@
   font-weight: 500;
 }
 .fd-docs em {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-style: normal;
   font-weight: 600;
   padding: 0.2rem 0.55rem;

@@ -13,9 +13,51 @@
   --x-dir: -1;
 }
 
-/* Latin + digits in Montserrat (like the template), Hebrew falls back to Heebo */
-body {
-  font-family: 'Montserrat', 'Heebo', ui-sans-serif, system-ui, sans-serif;
+/* ---------------- type: the booking-system-he house setup ----------------
+   Digits + ₪ from Google Sans (clearer numbers), Hebrew in FUP Galil,
+   Latin (Ice Diamonds, UPS, GROW) in Montserrat like the template. */
+@font-face { font-family: 'Galil'; src: url('/fonts/galil-400.woff2') format('woff2'); font-weight: 400; font-display: swap; unicode-range: U+0020-0040, U+005B-0060, U+007B-007E, U+00A0, U+00AD, U+00D7, U+0590-05FF, U+2013, U+2018-2019, U+201C-201D, U+20AA; }
+@font-face { font-family: 'Galil'; src: url('/fonts/galil-500.woff2') format('woff2'); font-weight: 500; font-display: swap; unicode-range: U+0020-0040, U+005B-0060, U+007B-007E, U+00A0, U+00AD, U+00D7, U+0590-05FF, U+2013, U+2018-2019, U+201C-201D, U+20AA; }
+@font-face { font-family: 'Galil'; src: url('/fonts/galil-600.woff2') format('woff2'); font-weight: 600; font-display: swap; unicode-range: U+0020-0040, U+005B-0060, U+007B-007E, U+00A0, U+00AD, U+00D7, U+0590-05FF, U+2013, U+2018-2019, U+201C-201D, U+20AA; }
+@font-face { font-family: 'Galil'; src: url('/fonts/galil-700.woff2') format('woff2'); font-weight: 700; font-display: swap; unicode-range: U+0020-0040, U+005B-0060, U+007B-007E, U+00A0, U+00AD, U+00D7, U+0590-05FF, U+2013, U+2018-2019, U+201C-201D, U+20AA; }
+@font-face { font-family: 'Galil'; src: url('/fonts/galil-800.woff2') format('woff2'); font-weight: 800; font-display: swap; unicode-range: U+0020-0040, U+005B-0060, U+007B-007E, U+00A0, U+00AD, U+00D7, U+0590-05FF, U+2013, U+2018-2019, U+201C-201D, U+20AA; }
+@font-face { font-family: 'Google Sans Num'; src: url('/fonts/google-sans-num-400.woff') format('woff'); font-weight: 300 400; font-display: swap; unicode-range: U+0025, U+002C-002F, U+0030-003A, U+20AA; }
+@font-face { font-family: 'Google Sans Num'; src: url('/fonts/google-sans-num-500.woff') format('woff'); font-weight: 500; font-display: swap; unicode-range: U+0025, U+002C-002F, U+0030-003A, U+20AA; }
+@font-face { font-family: 'Google Sans Num'; src: url('/fonts/google-sans-num-600.woff') format('woff'); font-weight: 600; font-display: swap; unicode-range: U+0025, U+002C-002F, U+0030-003A, U+20AA; }
+@font-face { font-family: 'Google Sans Num'; src: url('/fonts/google-sans-num-700.woff') format('woff'); font-weight: 700 800; font-display: swap; unicode-range: U+0025, U+002C-002F, U+0030-003A, U+20AA; }
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: 'Google Sans Num', 'Galil', 'Montserrat', 'Heebo', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* A steady base size. The template shrank the whole UI with the window height
+   (11.7px on a 1536×864 laptop, 10px on smaller ones) — that is what felt tiny and fragile. */
+html {
+  font-size: 15px;
+}
+@media (min-width: 1700px) {
+  html {
+    font-size: 16px;
+  }
+}
+@media (max-width: 1280px) and (min-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+.app {
+  padding: 1.1rem clamp(1rem, 2vw, 2.4rem);
+}
+
+/* Secondary text strong enough to read (template greys were ~2.5:1 on white) */
+:root {
+  --muted: #6c7880;
+  --muted-2: #8b979f;
+  --ink-2: #2d3a44;
 }
 
 /* Charts keep a left-to-right time axis; their absolute labels/tooltips are positioned in LTR space */
@@ -84,7 +126,7 @@ body {
 /* phones: no green frame/rail — a top bar with a hamburger menu instead (Amit's preference) */
 @media (max-width: 767px) {
   html {
-    font-size: 13px;
+    font-size: 15px;
   }
   .app {
     padding: 0;
@@ -283,3 +325,34 @@ body {
 .card-title {
   letter-spacing: 0;
 }
+
+/* wider side column (bigger type needs the room) */
+.board {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr) minmax(0, 0.9fr);
+  gap: 2.4rem 2.4rem;
+  padding-bottom: 6rem; /* room for the peeking folder so the panel never cuts it */
+}
+.peek {
+  bottom: -5.2rem;
+}
+@media (max-width: 1180px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  }
+}
+@media (max-width: 860px) {
+  .board {
+    padding-bottom: 2rem;
+  }
+}
+
+/* narrow column: keep the source names apart */
+.flow-card .bc-x {
+  font-size: 0.8rem;
+}
+
+
+.file-meta > span {
+  white-space: nowrap;
+}
+

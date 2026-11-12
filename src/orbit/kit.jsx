@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon'
-import { compact, ils, monotone, num, placePill, toArea, useCountUp, useEnter, usePopover, useSize, useStable, useTween } from './lib'
+import { compact, ils, monotone, num, placePill, toArea, useCountUp, useEnter, useFontsReady, usePopover, useSize, useStable, useTween } from './lib'
 
 const cleanId = (id) => id.replace(/[^a-zA-Z0-9_-]/g, '')
 
@@ -197,6 +197,7 @@ export function Segmented({ options, value, onChange, size, label }) {
   const ref = useRef(null)
   const pill = useRef(null)
   const { w } = useSize(ref)
+  useFontsReady()
   useLayoutEffect(() => {
     placePill(pill.current, ref.current?.querySelector('[aria-selected="true"]'))
   })

@@ -93,7 +93,7 @@
   animation-delay: calc(var(--base, 0ms) + var(--d, 0) * 60ms + 120ms + var(--i, 0) * 60ms);
 }
 .tkp-stage small {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -117,7 +117,7 @@
   letter-spacing: -0.02em;
 }
 .tkp-goal .ring-x-center span {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
 }
 .tkp-goal-list {
   display: grid;
@@ -143,7 +143,7 @@
   border-radius: 50%;
 }
 .tkp-goal-list span {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -191,7 +191,7 @@
   align-items: center;
   gap: 0.7rem;
   padding: 0.1rem 0.25rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   font-weight: 600;
   color: var(--muted);
 }
@@ -266,7 +266,7 @@
 }
 .tkp-dr-amount > span:first-child {
   width: 100%;
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -289,7 +289,7 @@
   background: #f6f9f9;
 }
 .tkp-dr-list dt {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -347,7 +347,7 @@
   font-weight: 600;
 }
 .tkp-dr-steps span {
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   color: var(--muted);
 }
 .tkp-dr-actions {
@@ -407,7 +407,7 @@
   font-variant-numeric: tabular-nums;
 }
 .lf-docs-body li span {
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -460,7 +460,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   color: var(--muted);
 }
 
@@ -573,7 +573,7 @@
 }
 .rep-tpl p {
   min-height: 2.3rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   line-height: 1.45;
   color: var(--muted);
 }
@@ -611,7 +611,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 600;
   color: var(--teal);
   white-space: nowrap;
@@ -661,7 +661,7 @@
   font-weight: 600;
 }
 .rep-sched span {
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   color: var(--muted);
 }
 .rep-sched-ic {
@@ -684,7 +684,7 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 1rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   font-weight: 600;
   color: var(--muted);
 }

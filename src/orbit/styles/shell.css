@@ -136,7 +136,7 @@
   line-height: 1.1;
 }
 .brand-text span {
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 500;
   opacity: 0.78;
 }
@@ -156,7 +156,7 @@
   display: flex;
   align-items: center;
   padding-inline-start: 0.95rem;
-  font-size: 0.68rem;
+  font-size: 0.852rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -279,7 +279,7 @@
   border-radius: 99px;
   background: rgb(255 255 255 / 0.2);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 700;
   transition:
     opacity 0.2s,
@@ -290,7 +290,7 @@
 .nav-badge.is-tag {
   background: #fff;
   color: var(--green-3);
-  font-size: 0.6rem;
+  font-size: 0.82rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -371,7 +371,7 @@
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
 }
 .goal-top b {
@@ -393,7 +393,7 @@
   animation: grow 1.4s var(--out) calc(var(--side-base, 0ms) + 1s) both;
 }
 .goal p {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   opacity: 0.8;
 }
 
@@ -413,7 +413,7 @@
   border: 2px solid #5aaa60;
   background: var(--red);
   color: #fff;
-  font-size: 0.56rem;
+  font-size: 0.804rem;
   font-style: normal;
   font-weight: 700;
   opacity: 0;
@@ -467,7 +467,7 @@
 }
 .profile-text span {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   opacity: 0.78;
 }
 .profile-more {
@@ -497,7 +497,7 @@
   font-weight: 600;
 }
 .profile-vertical span {
-  font-size: 0.68rem;
+  font-size: 0.852rem;
   opacity: 0.6;
 }
 .frame.is-collapsed .profile-vertical {

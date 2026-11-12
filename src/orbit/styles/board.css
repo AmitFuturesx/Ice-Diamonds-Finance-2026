@@ -211,7 +211,7 @@
   font-variant-numeric: tabular-nums;
 }
 .tk-tip span {
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   color: var(--muted);
   font-weight: 500;
 }
@@ -340,7 +340,7 @@
   font-weight: 700;
 }
 .donut-center span {
-  font-size: 0.68rem;
+  font-size: 0.852rem;
   color: var(--muted);
   font-weight: 500;
 }
@@ -565,7 +565,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 0.6rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -590,7 +590,7 @@
 }
 .file-lender {
   margin-top: 0.6rem;
-  font-size: 0.78rem;
+  font-size: 0.892rem;
   font-weight: 500;
   color: var(--muted-2);
 }
@@ -599,7 +599,7 @@
   margin-top: 0.75rem;
   padding: 0.2rem 0.6rem;
   border-radius: 99px;
-  font-size: 0.68rem;
+  font-size: 0.852rem;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -621,7 +621,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -726,7 +726,7 @@
   border-radius: 0.55rem;
   background: rgb(23 52 44 / 0.86);
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 500;
   white-space: nowrap;
   pointer-events: none;
@@ -834,7 +834,7 @@
 }
 .pf-row--head {
   height: 2.3rem;
-  font-size: 0.76rem;
+  font-size: 0.884rem;
   font-weight: 500;
   color: var(--muted);
 }
@@ -908,12 +908,12 @@
   border: 1px solid var(--line);
   border-radius: 0.45rem;
   font: inherit;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--muted);
 }
 .search-count {
-  font-size: 0.72rem;
+  font-size: 0.868rem;
   font-weight: 600;
   color: var(--teal-2);
   white-space: nowrap;
@@ -958,7 +958,7 @@
   border-radius: 99px;
   background: var(--green-soft);
   color: var(--green-3);
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 700;
 }
 .icon-btn {
@@ -1037,7 +1037,7 @@
   padding: 0.25rem 0.55rem;
   border-radius: 99px;
   background: #f0f4f5;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--ink-2);
   transition:
@@ -1236,7 +1236,7 @@
 }
 .task-due {
   margin-top: 0.4rem;
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 500;
   color: var(--muted-2);
 }
@@ -1357,12 +1357,12 @@
   font-size: 0.82rem;
 }
 .member-tip span {
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   opacity: 0.7;
 }
 .member-tip em {
   margin-top: 0.3rem;
-  font-size: 0.7rem;
+  font-size: 0.86rem;
   font-style: normal;
   color: #a9e394;
 }
@@ -1492,7 +1492,7 @@
   line-height: 1.2;
 }
 .flow-top span {
-  font-size: 0.74rem;
+  font-size: 0.876rem;
   font-weight: 500;
   color: var(--muted);
 }

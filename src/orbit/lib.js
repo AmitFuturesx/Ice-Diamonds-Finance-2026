@@ -264,3 +264,17 @@ export const initials = (name = '') =>
     .map((s) => s[0])
     .join('')
     .slice(0, 2)
+
+/** Re-renders once web fonts have loaded, so pills measured against text land in the right place. */
+export function useFontsReady() {
+  const [ready, setReady] = useState(() => typeof document === 'undefined' || document.fonts?.status === 'loaded')
+  useEffect(() => {
+    if (ready || !document.fonts) return undefined
+    let alive = true
+    document.fonts.ready.then(() => alive && setReady(true))
+    return () => {
+      alive = false
+    }
+  }, [ready])
+  return ready
+}

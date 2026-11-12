@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
 import { BarChart, Delta, Drawer, DrawerHead, Empty, Highlight, MoodPill, Segmented, Select, StatusPill, Avatar, nextMood, nextStatus } from './kit'
-import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, useDismiss, useEnter, useFlip, useSize, useStable, useTween } from './lib'
+import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, useDismiss, useEnter, useFlip, useFontsReady, useSize, useStable, useTween } from './lib'
 import { computePay } from '../lib/payroll'
 import { dbService } from '../lib/supabase'
 
 const SHORT_MONTH = ['', 'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳']
 const SOURCES = [
-  { id: 'מקסימוס', short: 'מקסימוס' },
+  { id: 'מקסימוס', short: 'מקס׳' },
   { id: 'UPS', short: 'UPS' },
   { id: 'מזומן', short: 'מזומן' },
   { id: 'העברה בנקאית', short: 'העברה' },
@@ -376,9 +376,10 @@ function CashFlow({ series, monthName, totalIncome }) {
 
   const tabsRef = useRef(null)
   const tabPill = useRef(null)
+  const fonts = useFontsReady()
   useLayoutEffect(() => {
     placePill(tabPill.current, tabsRef.current?.querySelector('.is-on'))
-  }, [range, w])
+  }, [range, w, fonts])
 
   return (
     <section className="tk sect rise" id="sec-cashflow" style={{ '--d': 2 }}>
@@ -588,6 +589,7 @@ function DayDonut({ day }) {
 
 /* ============================================================== */
 /* Balance (template's Savings card)                                */
+const DECOR = Array.from({ length: 14 }, (_, i) => ({ label: '', income: 34 + i * 3.6 + Math.sin(i * 1.15) * 6 + Math.sin(i * 2.7) * 3, expenses: 0, net: 0, ghost: true }))
 function Balance({ series, net, income, expenses, monthName, onExport }) {
   const [menu, setMenu] = useState(false)
   const [showExp, setShowExp] = useState(true)
@@ -596,7 +598,10 @@ function Balance({ series, net, income, expenses, monthName, onExport }) {
   const closeMenu = useCallback(() => setMenu(false), [])
   useDismiss(menuRef, closeMenu, menu)
 
-  const rows = series.length > 1 ? series : series.length === 1 ? [{ ...series[0], income: 0, expenses: 0, ghost: true }, series[0]] : []
+  // With fewer than two months of real numbers the curve would be a bare triangle,
+  // so the card shows a calm decorative wave instead (no tooltip, no dashed line).
+  const enough = series.filter((s) => s.income || s.expenses).length >= 2
+  const rows = enough ? series : DECOR
   const N = rows.length
   const peak = Math.max(1, ...rows.map((r) => Math.max(r.income, r.expenses))) * 1.08
   const areaT = useStable(rows.map((r) => (r.income / peak) * 100))
@@ -637,7 +642,7 @@ function Balance({ series, net, income, expenses, monthName, onExport }) {
           className="sv-chart"
           ref={chartRef}
           onPointerMove={(e) => {
-            if (N < 2) return
+            if (!enough) return
             const r = chartRef.current.getBoundingClientRect()
             setHover(Math.max(0, Math.min(N - 1, Math.round(((e.clientX - r.left) / r.width) * (N - 1)))))
           }}
@@ -654,7 +659,7 @@ function Balance({ series, net, income, expenses, monthName, onExport }) {
               </defs>
               <path d={toArea(lineA, ptsA, h + 2)} fill="url(#svFill)" />
               <path className="sv-edge" d={lineA} />
-              {showExp && <path className="sv-dash" d={lineL} />}
+              {showExp && enough && <path className="sv-dash" d={lineL} />}
               {hover != null && !rows[hover]?.ghost && (
                 <g className="sv-focus">
                   <line x1={ptsA[hover][0]} x2={ptsA[hover][0]} y1={ptsA[hover][1]} y2={h} />
