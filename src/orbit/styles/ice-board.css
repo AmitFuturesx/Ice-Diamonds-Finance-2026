@@ -544,33 +544,46 @@
 .ice-pop-main {
   min-width: 0;
 }
-.ice-pop-main b {
-  display: block;
-  font-size: 0.96rem;
+/* name and amount sit together on one line: "אלנתן  ₪2,655" */
+.ice-pop-name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.ice-pop-name b {
+  min-width: 0;
+  font-size: 0.98rem;
   font-weight: 600;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ice-pop-main span {
+.ice-pop-amt {
+  flex: none;
+  padding: 0.05rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 0.75);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ice-pop-where {
   display: block;
+  margin-top: 0.1rem;
   font-size: 0.8rem;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ice-pop-amt {
-  font-size: 1rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 .ice-pop-pills {
-  grid-column: 2 / -1;
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 .ice-pop-empty {
@@ -724,6 +737,11 @@
     max-height: 56vh;
   }
   .ice-pop-row {
+    grid-template-columns: auto minmax(0, 1fr);
     padding: 0.75rem 0.8rem;
+  }
+  .ice-pop-pills {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
   }
 }

@@ -218,28 +218,13 @@ export default function Dashboard(props) {
         </button>
       </PageHead>
 
-      {/* ---------- 1. category blocks ---------- */}
-      <section className="ice-row">
-        <div className="ice-row-head">
-          <h2 className="sec-title">תשלומים לפי קטגוריה</h2>
-          <p className="sec-sub">לחיצה על כל סכום פותחת את הרשימה</p>
-        </div>
-        <div className="ice-cats">
-          {cats.map((c, i) => (
-            <div key={c.id} className="ice-slot">
-              <CatBlock c={c} d={i} onOpen={(filter) => setPop({ kind: 'cat', key: c.id, filter })} onPage={() => onNavigate?.(c.page)} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------- 2. balance ---------- */}
+      {/* ---------- 1. balance ---------- */}
       <section className="ice-row">
         <div className="ice-row-head">
           <h2 className="sec-title">מאזן החודש</h2>
           <p className="sec-sub">רווח = הכנסות פחות הוצאות</p>
         </div>
-        <div className="card ice-bal card-in" style={{ '--d': 5 }}>
+        <div className="card ice-bal card-in" style={{ '--d': 0 }}>
           <button type="button" className="ice-bal-cell" style={{ '--tone': '#57b05c' }} onClick={() => onNavigate?.('income')}>
             <span className="ice-bal-top">
               <span className="ice-bal-ic">
@@ -300,6 +285,21 @@ export default function Dashboard(props) {
             </b>
             <small>{income ? `${Math.round((profit / income) * 100)}% מההכנסות נשארו בעסק` : 'הכנסות פחות הוצאות'}</small>
           </div>
+        </div>
+      </section>
+
+      {/* ---------- 2. category blocks ---------- */}
+      <section className="ice-row">
+        <div className="ice-row-head">
+          <h2 className="sec-title">תשלומים לפי קטגוריה</h2>
+          <p className="sec-sub">לחיצה על כל סכום פותחת את הרשימה</p>
+        </div>
+        <div className="ice-cats">
+          {cats.map((c, i) => (
+            <div key={c.id} className="ice-slot">
+              <CatBlock c={c} d={1 + i} onOpen={(filter) => setPop({ kind: 'cat', key: c.id, filter })} onPage={() => onNavigate?.(c.page)} />
+            </div>
+          ))}
         </div>
       </section>
 
@@ -515,10 +515,12 @@ function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, 
                 <Icon name="check" />
               </button>
               <div className="ice-pop-main">
-                <b>{o.name}</b>
-                {where && <span>{where}</span>}
+                <p className="ice-pop-name">
+                  <b>{o.name}</b>
+                  <span className="ice-pop-amt">{ils(o.amount)}</span>
+                </p>
+                {where && <span className="ice-pop-where">{where}</span>}
               </div>
-              <b className="ice-pop-amt">{ils(o.amount)}</b>
               <div className="ice-pop-pills">
                 <StatusPill status={o.status} onClick={() => onStatus(o)} />
                 {o.mood && <MoodPill mood={o.mood} onClick={() => onMood(o)} />}
