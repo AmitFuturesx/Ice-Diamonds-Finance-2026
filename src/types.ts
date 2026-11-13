@@ -61,6 +61,7 @@ export interface Delivery {
   price: number;
   notes: string;
   status?: PaymentStatus; // needs the deliveries.status column (supabase/migrations/2026-11-13_deliveries_status.sql)
+  payment_day?: string; // "10" / "15" / "19" or "" (supabase/migrations/2026-11-13_payment_day.sql)
 }
 
 // ---------- Employees / payroll ----------
@@ -81,6 +82,7 @@ export interface Employee {
   override_pct: number;    // % this person earns on deals closed by reps under them
   vat_mode: VatMode;
   active: boolean;
+  payment_day?: string; // salary day: "10" / "15" / "19" or "" (supabase/migrations/2026-11-13_payment_day.sql)
 }
 
 // One employee's numbers for one month

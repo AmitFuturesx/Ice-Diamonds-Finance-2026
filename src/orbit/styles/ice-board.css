@@ -586,6 +586,20 @@
   justify-content: flex-end;
   gap: 0.35rem;
 }
+.ice-day-chip {
+  font-weight: 600;
+}
+.ice-day-chip .ice-day-chev {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-inline-start: 0.1rem;
+  opacity: 0.7;
+}
+.pop--floating .menu-item.is-on {
+  color: var(--teal);
+  font-weight: 600;
+  background: var(--teal-soft);
+}
 .ice-pop-empty {
   display: flex;
   flex-direction: column;

@@ -8,8 +8,8 @@
 ------------------------------------------------------------------- */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
-import { BarChart, Delta, MOODS, MoodPill, PageHead, Pill, Segmented, StatusPill, nextMood, nextStatus } from './kit'
-import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, useEnter, useFontsReady, useSize, useStable, useTween } from './lib'
+import { BarChart, Delta, Floating, MOODS, MoodPill, PageHead, Pill, Segmented, StatusPill, nextMood, nextStatus } from './kit'
+import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, usePopover, useEnter, useFontsReady, useSize, useStable, useTween } from './lib'
 import { computePay, VAT_RATE } from '../lib/payroll'
 import { dbService } from '../lib/supabase'
 import { Modal, MonthBar } from './pages/common'
@@ -52,6 +52,7 @@ const n0 = (v) => Number(v) || 0
 const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`
 const isPaid = (o) => o.status === PAID
 const sumOf = (list) => list.reduce((a, o) => a + o.amount, 0)
+const pad2 = (n) => String(n).padStart(2, '0')
 const bucketKey = (n) => (n == null || isNaN(n) ? 'unknown' : String([10, 15, 19].reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p))))
 const monthLabel = (m) => (m ? (m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`) : '')
 const fmtDate = (s) => {
@@ -99,6 +100,7 @@ export default function Dashboard(props) {
     onSaveDebt,
     onSaveDelivery,
     onSaveEmployeeMonth,
+    onSaveEmployee,
     onNavigate,
     notify
   } = props
@@ -112,9 +114,9 @@ export default function Dashboard(props) {
       ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
       ...employees
         .filter((e) => e.active !== false)
-        .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', name: e.name, sub: e.role, amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),
+        .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', name: e.name, sub: e.role, dayKey: bucketKey(e.payment_day ? parseInt(e.payment_day, 10) : NaN), amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),
       ...debts.map((d) => ({ uid: `d${d.id}`, cat: 'debt', name: d.name, amount: n0(d.monthly_payment), status: d.status || UNPAID, dayKey: bucketKey(d.payment_date ? parseInt(String(d.payment_date).split('-').pop(), 10) : NaN), mood: d.mood || 'happy', raw: d })),
-      ...deliveries.map((d) => ({ uid: `s${d.id}`, cat: 'delivery', name: `${d.route_from} ← ${d.route_to}`, sub: fmtDate(d.date), amount: n0(d.price) * (1 + VAT_RATE), status: d.status || UNPAID, raw: d }))
+      ...deliveries.map((d) => ({ uid: `s${d.id}`, cat: 'delivery', name: `${d.route_from} ← ${d.route_to}`, sub: fmtDate(d.date), dayKey: bucketKey(d.payment_day ? parseInt(d.payment_day, 10) : NaN), amount: n0(d.price) * (1 + VAT_RATE), status: d.status || UNPAID, raw: d }))
     ],
     [fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries]
   )
@@ -142,15 +144,27 @@ export default function Dashboard(props) {
   const togglePaid = (o) => setStatus(o, isPaid(o) ? UNPAID : PAID)
   const cycleStatus = (o) => setStatus(o, nextStatus(o.status))
   const cycleMood = (o) => save(o, { mood: nextMood(o.mood) })
+  /* payment day: 10 / 15 / 19 / unknown — each category keeps it in its own field */
+  const setDay = (o, d) => {
+    const unknown = d === 'unknown'
+    if (o.cat === 'fixed') save(o, { payment_date: unknown ? '' : d })
+    else if (o.cat === 'debt') save(o, { payment_date: unknown ? 'לא סומן' : d })
+    else if (o.cat === 'variable') {
+      const y = activeMonth?.year || new Date().getFullYear()
+      const m = activeMonth?.month_number || new Date().getMonth() + 1
+      save(o, { date: unknown ? '' : `${y}-${pad2(m)}-${pad2(d)}` })
+    } else if (o.cat === 'delivery') save(o, { payment_day: unknown ? '' : d })
+    else if (o.cat === 'payroll') onSaveEmployee?.({ ...o.raw, payment_day: unknown ? '' : d })
+    notify?.(unknown ? `הוסר התאריך של ${o.name}` : `${o.name} · לתשלום ב־${d} לחודש`, { tone: 'success' })
+  }
 
   /* ---------- numbers ---------- */
   const cats = CATS.map((c) => ({ ...c, ...stats(items.filter((o) => o.cat === c.id)) }))
   const all = stats(items)
   const income = incomeEntries.reduce((a, e) => a + n0(e.amount), 0)
   const profit = income - all.total
-  const dated = items.filter((o) => o.dayKey)
   const days = DAYS.map((d) => {
-    const s = stats(dated.filter((o) => o.dayKey === d.key))
+    const s = stats(items.filter((o) => o.dayKey === d.key))
     const open = s.list.filter((o) => !isPaid(o))
     return { ...d, ...s, angry: open.filter((o) => o.mood === 'angry').length, neutral: open.filter((o) => o.mood === 'neutral').length, calm: open.filter((o) => o.mood === 'happy').length }
   })
@@ -192,14 +206,14 @@ export default function Dashboard(props) {
     if (!pop) return null
     if (pop.kind === 'cat') {
       const c = cats.find((x) => x.id === pop.key)
-      return { title: c.title, icon: c.icon, tone: c.tone, s: c, page: c.page, showDay: c.id !== 'payroll' && c.id !== 'delivery' }
+      return { title: c.title, icon: c.icon, tone: c.tone, s: c, page: c.page, byDay: true }
     }
     if (pop.kind === 'day') {
       const d = days.find((x) => x.key === pop.key)
       const moods = [d.angry && pl(d.angry, 'כועס', 'כועסים'), d.neutral && pl(d.neutral, 'העיר', 'העירו'), d.calm && pl(d.calm, 'רגוע', 'רגועים')].filter(Boolean).join(' · ')
       return { title: d.key === 'unknown' ? 'תשלומים בלי תאריך' : `תשלומים ב־${d.label}`, icon: 'calendar', tone: '#2c6d85', s: d, sub: moods, showCat: true }
     }
-    return { title: 'כל התשלומים של החודש', icon: 'wallet', tone: '#2c6d85', s: all, showCat: true, showDay: true }
+    return { title: 'כל התשלומים של החודש', icon: 'wallet', tone: '#2c6d85', s: all, showCat: true, byDay: true }
   })()
 
   return (
@@ -307,7 +321,7 @@ export default function Dashboard(props) {
       <section className="ice-row">
         <div className="ice-row-head">
           <h2 className="sec-title">ימי תשלום</h2>
-          <p className="sec-sub">כמה נשאר לשלם בכל תאריך · הוצאות קבועות, משתנות וחובות</p>
+          <p className="sec-sub">כמה נשאר לשלם בכל תאריך · אפשר לקבוע תאריך לכל תשלום מתוך הרשימה</p>
         </div>
         <div className="ice-days">
           {days.map((d, i) => (
@@ -335,6 +349,7 @@ export default function Dashboard(props) {
               onToggle={togglePaid}
               onStatus={cycleStatus}
               onMood={cycleMood}
+              onDay={setDay}
               onPage={
                 popData.page
                   ? () => {
@@ -466,16 +481,60 @@ function DayBlock({ day, today, d, onOpen }) {
 }
 
 /* ============================================================== */
+/* Payment-day chip with a small menu: 10 / 15 / 19 / unknown.     */
+function DayChip({ dayKey, name, onPick }) {
+  const pop = usePopover('start')
+  const unknown = dayKey === 'unknown'
+  return (
+    <>
+      <button
+        type="button"
+        className={`pill ${unknown ? 'pill--orange' : 'pill--teal'} is-click ice-day-chip`}
+        onClick={(e) => {
+          e.stopPropagation()
+          pop.toggle(e)
+        }}
+        aria-expanded={pop.open}
+        aria-label={`יום תשלום · ${name}`}
+        title="מתי משלמים"
+      >
+        <Icon name="calendar" className="pill-ic" />
+        {unknown ? 'קבע תאריך' : DAY_LABEL[dayKey]}
+        <Icon name="chevronDown" className="pill-ic ice-day-chev" />
+      </button>
+      <Floating open={pop.open} pos={pop.pos} close={pop.close} label="יום תשלום">
+        {DAYS.map((d) => (
+          <button
+            key={d.key}
+            type="button"
+            role="menuitem"
+            className={`menu-item ${d.key === dayKey ? 'is-on' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              pop.close()
+              if (d.key !== dayKey) onPick(d.key)
+            }}
+          >
+            <Icon name={d.key === dayKey ? 'check' : 'calendar'} />
+            <span className="menu-label">{d.key === 'unknown' ? 'לא ידוע' : d.label}</span>
+          </button>
+        ))}
+      </Floating>
+    </>
+  )
+}
+
+/* ============================================================== */
 /* Popup list: three switchable totals, then the payments.         */
-function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, onPage }) {
+function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, onDay, onPage }) {
   const { s } = data
   const list = s.list
     .filter((o) => (filter === 'left' ? !isPaid(o) : filter === 'paid' ? isPaid(o) : true))
     .sort(
       (a, b) =>
         Number(isPaid(a)) - Number(isPaid(b)) ||
+        (data.byDay ? (DAY_ORDER[a.dayKey] ?? 4) - (DAY_ORDER[b.dayKey] ?? 4) : 0) ||
         (MOOD_RANK[a.mood] ?? 3) - (MOOD_RANK[b.mood] ?? 3) ||
-        (DAY_ORDER[a.dayKey] ?? 4) - (DAY_ORDER[b.dayKey] ?? 4) ||
         b.amount - a.amount
     )
   const value = { all: s.total, left: s.left, paid: s.paid }
@@ -508,7 +567,7 @@ function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, 
       <ul className="ice-pop-list">
         {list.map((o) => {
           const done = isPaid(o)
-          const where = [data.showCat && CAT[o.cat].title, data.showDay && o.dayKey && DAY_LABEL[o.dayKey], o.sub].filter(Boolean).join(' · ')
+          const where = [data.showCat && CAT[o.cat].title, o.sub].filter(Boolean).join(' · ')
           return (
             <li key={o.uid} className={`ice-pop-row ${done ? 'is-paid' : ''} ${o.mood && !done ? `is-${o.mood}` : ''}`}>
               <button type="button" className={`ice-check ${done ? 'is-on' : ''}`} onClick={() => onToggle(o)} aria-pressed={done} aria-label={done ? `החזרה ללא שולם: ${o.name}` : `סימון כשולם: ${o.name}`} title={done ? 'החזרה ללא שולם' : 'סימון כשולם'}>
@@ -522,6 +581,7 @@ function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, 
                 {where && <span className="ice-pop-where">{where}</span>}
               </div>
               <div className="ice-pop-pills">
+                <DayChip dayKey={o.dayKey} name={o.name} onPick={(d) => onDay(o, d)} />
                 <StatusPill status={o.status} onClick={() => onStatus(o)} />
                 {o.mood && <MoodPill mood={o.mood} onClick={() => onMood(o)} />}
               </div>

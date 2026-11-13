@@ -530,8 +530,17 @@ export default function App() {
       });
     } catch (err) {
       console.error(err);
-      const missingStatus = 'status' in item && /status/i.test(String((err as { message?: string })?.message || ''));
-      pushToast(missingStatus ? 'סימון תשלום לשליחויות דורש הרצת פקודת SQL קצרה (deliveries_status) ב-Supabase' : 'שמירת השליחות נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
+      const msg = String((err as { message?: string })?.message || '');
+      const missingDay = 'payment_day' in item && /payment_day/i.test(msg);
+      const missingStatus = 'status' in item && /status/i.test(msg);
+      pushToast(
+        missingDay
+          ? 'קביעת יום תשלום לשליחויות דורשת הרצת פקודת SQL קצרה (payment_day) ב-Supabase'
+          : missingStatus
+            ? 'סימון תשלום לשליחויות דורש הרצת פקודת SQL קצרה (deliveries_status) ב-Supabase'
+            : 'שמירת השליחות נכשלה, נסה שוב',
+        { tone: 'error', duration: 8000 }
+      );
     }
   };
 
@@ -554,7 +563,8 @@ export default function App() {
       setEmployees(prev => (prev.some(p => p.id === saved.id) ? prev.map(p => (p.id === saved.id ? saved : p)) : [...prev, saved]));
     } catch (err) {
       console.error(err);
-      alert('שמירת העובד נכשלה. ודא שהרצת את פקודת ה-SQL של טבלאות העובדים.');
+      const missingDay = 'payment_day' in item && /payment_day/i.test(String((err as { message?: string })?.message || ''));
+      pushToast(missingDay ? 'קביעת יום תשלום לעובדים דורשת הרצת פקודת SQL קצרה (payment_day) ב-Supabase' : 'שמירת העובד נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
     }
   };
 
@@ -867,6 +877,7 @@ export default function App() {
                     deliveries={deliveries}
                     onSaveDelivery={handleSaveDelivery}
                     onSaveEmployeeMonth={handleSaveEmployeeMonth}
+                    onSaveEmployee={handleSaveEmployee}
                     employees={employees}
                     employeeMonths={employeeMonths}
                     onNavigate={(p: ActivePage) => setActivePage(p)}
