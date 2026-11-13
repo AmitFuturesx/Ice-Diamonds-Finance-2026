@@ -13,6 +13,7 @@ import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCou
 import { computePay, VAT_RATE } from '../lib/payroll'
 import { dbService } from '../lib/supabase'
 import { Modal, MonthBar } from './pages/common'
+import { CAT, CATS, DAYS, DAY_LABEL, DAY_ORDER, UNPAID, buildPayments } from './payments'
 
 const SHORT_MONTH = ['', 'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳']
 const SOURCES = [
@@ -22,25 +23,8 @@ const SOURCES = [
   { id: 'העברה בנקאית', short: 'העברה' },
   { id: 'משולם / GROW', short: 'GROW' }
 ]
-const CATS = [
-  { id: 'fixed', title: 'הוצאות קבועות', icon: 'receipt', tone: '#2c6d85', page: 'fixed_expenses' },
-  { id: 'variable', title: 'הוצאות משתנות', icon: 'card', tone: '#a65ad6', page: 'variable_expenses' },
-  { id: 'payroll', title: 'עובדים ושכר', icon: 'users', tone: '#3f9163', page: 'employees' },
-  { id: 'debt', title: 'חובות והלוואות', icon: 'bank', tone: '#e0892a', page: 'debts' },
-  { id: 'delivery', title: 'שליחויות', icon: 'truck', tone: '#3a87a0', page: 'deliveries' }
-]
-const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]))
-const DAYS = [
-  { key: '10', dn: 10, label: '10 לחודש' },
-  { key: '15', dn: 15, label: '15 לחודש' },
-  { key: '19', dn: 19, label: '19 לחודש' },
-  { key: 'unknown', dn: null, label: 'תאריך לא ידוע' }
-]
-const DAY_LABEL = Object.fromEntries(DAYS.map((d) => [d.key, d.label]))
-const DAY_ORDER = { 10: 0, 15: 1, 19: 2, unknown: 3 }
 const MOOD_RANK = { angry: 0, neutral: 1, happy: 2 }
 const PAID = 'שולם'
-const UNPAID = 'לא שולם'
 const FILTERS = [
   { id: 'all', label: 'סה״כ לשלם' },
   { id: 'left', label: 'נותר לשלם' },
@@ -53,13 +37,7 @@ const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`
 const isPaid = (o) => o.status === PAID
 const sumOf = (list) => list.reduce((a, o) => a + o.amount, 0)
 const pad2 = (n) => String(n).padStart(2, '0')
-const bucketKey = (n) => (n == null || isNaN(n) ? 'unknown' : String([10, 15, 19].reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p))))
 const monthLabel = (m) => (m ? (m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`) : '')
-const fmtDate = (s) => {
-  if (!s) return ''
-  const p = String(s).split('-')
-  return p.length === 3 ? `${p[2]}/${p[1]}` : s
-}
 /** Totals of a list: everything, what is still open (incl. partly paid) and what is fully paid. */
 const stats = (list) => {
   const paidL = list.filter(isPaid)
@@ -109,15 +87,7 @@ export default function Dashboard(props) {
 
   /* ---------- every payment of the month, in one shape ---------- */
   const items = useMemo(
-    () => [
-      ...fixedExpenses.map((e) => ({ uid: `f${e.id}`, cat: 'fixed', name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN), mood: e.mood || 'happy', raw: e })),
-      ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
-      ...employees
-        .filter((e) => e.active !== false)
-        .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', name: e.name, sub: e.role, dayKey: bucketKey(e.payment_day ? parseInt(e.payment_day, 10) : NaN), amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),
-      ...debts.map((d) => ({ uid: `d${d.id}`, cat: 'debt', name: d.name, amount: n0(d.monthly_payment), status: d.status || UNPAID, dayKey: bucketKey(d.payment_date ? parseInt(String(d.payment_date).split('-').pop(), 10) : NaN), mood: d.mood || 'happy', raw: d })),
-      ...deliveries.map((d) => ({ uid: `s${d.id}`, cat: 'delivery', name: `${d.route_from} ← ${d.route_to}`, sub: fmtDate(d.date), dayKey: bucketKey(d.payment_day ? parseInt(d.payment_day, 10) : NaN), amount: n0(d.price) * (1 + VAT_RATE), status: d.status || UNPAID, raw: d }))
-    ],
+    () => buildPayments({ fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries }),
     [fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries]
   )
 

@@ -676,7 +676,7 @@ export const dbService = {
 
   // ---------- Invoices → morning (expense drafts) ----------
   // The list of what was sent (✓ / ✗). Files are not stored in the app.
-  async getInvoiceUploads(limit = 200): Promise<InvoiceUpload[]> {
+  async getInvoiceUploads(limit = 1000): Promise<InvoiceUpload[]> {
     if (isLiveSupabase && supabaseClient) {
       const { data, error } = await supabaseClient
         .from('invoice_uploads')

@@ -917,7 +917,19 @@ export default function App() {
                   <ODeliveries deliveries={deliveries} {...pageMonth} onSaveDelivery={handleSaveDelivery} onDeleteDelivery={handleDeleteDelivery} />
                 )}
 
-                {activePage === 'invoices' && <OInvoices notify={pushToast} userEmail={currentUser?.email} />}
+                {activePage === 'invoices' && (
+                  <OInvoices
+                    notify={pushToast}
+                    userEmail={currentUser?.email}
+                    {...pageMonth}
+                    fixedExpenses={fixedExpenses}
+                    variableExpenses={variableExpenses}
+                    debts={debts}
+                    deliveries={deliveries}
+                    employees={employees}
+                    employeeMonths={employeeMonths}
+                  />
+                )}
 
                 {activePage === 'employees' && (
                   <OEmployees

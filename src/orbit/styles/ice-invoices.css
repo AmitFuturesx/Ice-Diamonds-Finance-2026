@@ -75,6 +75,119 @@
   font-size: 0.95rem;
 }
 
+/* ---------- this month's payments and their invoice ---------- */
+.ice-need-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+.ice-need-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 1.05rem;
+  background: var(--row-grey);
+}
+.ice-need-row.is-missing,
+.ice-need-row.is-failed {
+  background: #fdf3e6;
+}
+.ice-need-row.is-done {
+  background: var(--row-green);
+}
+.ice-need-row.is-skipped {
+  opacity: 0.7;
+}
+.ice-need-ic {
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--tone) 14%, #fff);
+  color: var(--tone);
+}
+.ice-need-ic .icon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.ice-need-main {
+  min-width: 0;
+}
+.ice-need-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem 0.6rem;
+  min-width: 0;
+}
+.ice-need-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 99px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ice-need-badge .icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke-width: 2.6;
+}
+.ice-need-badge .ice-spin {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-width: 2px;
+}
+.ice-need-badge.is-missing {
+  background: #fbe3c4;
+  color: #9a5a12;
+}
+.ice-need-badge.is-done {
+  background: #d7eed2;
+  color: var(--green-3);
+}
+.ice-need-badge.is-pending {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.ice-need-badge.is-skipped {
+  background: #e2e8ea;
+  color: var(--ink-2);
+}
+.ice-need-badge.is-failed {
+  background: #fbdcd9;
+  color: #c4423b;
+  white-space: normal;
+}
+.ice-need-file {
+  max-width: 12rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-need-skip,
+.ice-need-undo {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.ice-need-skip:hover,
+.ice-need-undo:hover {
+  color: var(--ink);
+}
+.ice-inv .ice-drop {
+  min-height: 0;
+  padding: 1.8rem 1.5rem;
+}
+
 /* ---------- list ---------- */
 .ice-inv-list {
   display: flex;
@@ -220,6 +333,15 @@
     flex-direction: column;
     align-items: stretch;
     gap: 0.8rem;
+  }
+  .ice-need-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0.75rem 0.8rem;
+  }
+  .ice-need-state {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
   }
   .ice-inv-row {
     grid-template-columns: auto minmax(0, 1fr) auto;

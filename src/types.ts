@@ -98,7 +98,8 @@ export interface EmployeeMonth {
 }
 
 // One file sent to morning (Green Invoice) as an expense draft — the ✓ / ✗ list on the invoices page
-export type InvoiceUploadStatus = 'pending' | 'sent' | 'failed';
+// 'skipped' = marked "no invoice needed" for that payment (no file)
+export type InvoiceUploadStatus = 'pending' | 'sent' | 'failed' | 'skipped';
 export interface InvoiceUpload {
   id: string;
   created_at: string;
@@ -109,6 +110,11 @@ export interface InvoiceUpload {
   error: string | null;
   morning_key: string | null;
   uploaded_by: string | null;
+  // the payment this invoice belongs to (empty for a loose upload)
+  month_id?: string | null;
+  item_kind?: 'fixed' | 'variable' | 'payroll' | 'debt' | 'delivery' | null;
+  item_id?: string | null;
+  item_name?: string | null;
 }
 
 export interface FinancialSummary {
