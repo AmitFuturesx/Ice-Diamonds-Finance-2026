@@ -4,6 +4,7 @@ import Icon from '../Icon'
 import { BarChart, CardHead, DonutMulti, Empty, Field, FormModal, Kpi, Menu, PageHead, Pager, Pill, Segmented, Select } from '../kit'
 import { compact, ils, ilsK, pctChange } from '../lib'
 import { Modal, MonthBar, SortBtn, downloadCsv, seriesOf, useHistory, useSorted } from './common'
+import IncomeDaily from './IncomeDaily'
 
 const SOURCES = ['מקסימוס', 'UPS', 'מזומן', 'העברה בנקאית', 'משולם / GROW']
 const SOURCE_COLOR = { 'מקסימוס': '#6cc06a', UPS: '#2c6d85', 'מזומן': '#f0a43c', 'העברה בנקאית': '#a65ad6', 'משולם / GROW': '#3a87a0' }
@@ -17,7 +18,8 @@ const fmtDate = (s) => {
 }
 
 export default function Income(props) {
-  const { incomeEntries = [], activeMonthId, months = [], onChangeMonth, onAddMonth, onSaveIncome, onDeleteIncome, notify } = props
+  const { incomeEntries = [], dailyOrders = [], activeMonthId, months = [], monthYear, monthNumber, onChangeMonth, onAddMonth, onSaveIncome, onDeleteIncome, onSaveDailyOrders, notify } = props
+  const [view, setView] = useState('daily')
   const amt = (e) => Number(e.amount) || 0
   const total = incomeEntries.reduce((a, e) => a + amt(e), 0)
   const bySource = SOURCES.map((s) => ({ id: s, value: incomeEntries.filter((e) => e.source === s).reduce((a, e) => a + amt(e), 0), n: incomeEntries.filter((e) => e.source === s).length }))
@@ -69,6 +71,34 @@ export default function Income(props) {
         </button>
       </PageHead>
 
+      <div className="ice-view-switch rv" style={{ '--i': 3 }}>
+        <Segmented
+          label="תצוגה"
+          value={view}
+          onChange={setView}
+          options={[
+            { id: 'daily', label: 'דוח יומי', icon: 'calendar' },
+            { id: 'sources', label: 'כל הרשומות', icon: 'file' }
+          ]}
+        />
+      </div>
+
+      {view === 'daily' && (
+        <IncomeDaily
+          incomeEntries={incomeEntries}
+          dailyOrders={dailyOrders}
+          monthYear={monthYear}
+          monthNumber={monthNumber}
+          activeMonthId={activeMonthId}
+          onSaveIncome={onSaveIncome}
+          onDeleteIncome={onDeleteIncome}
+          onSaveDailyOrders={onSaveDailyOrders}
+          notify={notify}
+        />
+      )}
+
+      {view === 'sources' && (
+      <>
       <div className="grid-kpi">
         <Kpi icon="coins" label="הכנסות החודש" value={total} spark={spark} delta={prev ? pctChange(total, prev) : null} d={0} foot={prev != null ? `בחודש הקודם ${ils(prev)}` : null} />
         <Kpi icon="star" label="המקור המוביל" value={lead?.value || 0} tone="teal" d={1} foot={lead?.value ? `${lead.id} · ${total ? Math.round((lead.value / total) * 100) : 0}% מההכנסות` : 'אין עדיין הכנסות'} onClick={lead?.value ? () => setSource(lead.id) : undefined} />
@@ -155,6 +185,8 @@ export default function Income(props) {
           {win.length > 0 ? <BarChart labels={win.map((m) => SHORT_MONTH[m.month_number] || m.name)} series={trendSeries} height="13rem" d={6} format={(v) => `₪${compact(v)}`} /> : <p className="empty">אין עדיין היסטוריה</p>}
         </section>
       </div>
+      </>
+      )}
 
       {form && (
         <Modal label="טופס הכנסה" onClose={() => setForm(null)}>

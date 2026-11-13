@@ -10,7 +10,8 @@ import {
   IncomeSource,
   Employee,
   EmployeeMonth,
-  InvoiceUpload
+  InvoiceUpload,
+  DailyOrders
 } from '../types';
 
 // Retrieve environment variables
@@ -672,6 +673,30 @@ export const dbService = {
     const created = { ...row, id: 'em_' + Math.random().toString(36).slice(2, 11) } as EmployeeMonth;
     saveToStorage('employee_months', [...list, created]);
     return created;
+  },
+
+  // ---------- Daily orders (daily income report) ----------
+  async getDailyOrders(monthId: string): Promise<DailyOrders[]> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient.from('daily_orders').select('*').eq('month_id', monthId);
+      if (error) throw error;
+      return (data as any) || [];
+    }
+    return getFromStorage<DailyOrders>('daily_orders').filter((d) => d.month_id === monthId);
+  },
+
+  /** One row per date: insert or update the orders count of that day. */
+  async saveDailyOrders(row: { month_id: string; date: string; orders: number }): Promise<DailyOrders> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient.from('daily_orders').upsert([row], { onConflict: 'date' }).select();
+      if (error) throw error;
+      return data[0];
+    }
+    const list = getFromStorage<DailyOrders>('daily_orders');
+    const existing = list.find((d) => d.date === row.date);
+    const saved = { ...(existing || { id: 'do_' + Math.random().toString(36).slice(2, 11) }), ...row } as DailyOrders;
+    saveToStorage('daily_orders', existing ? list.map((d) => (d.date === row.date ? saved : d)) : [...list, saved]);
+    return saved;
   },
 
   // ---------- Invoices → morning (expense drafts) ----------

@@ -9,7 +9,8 @@ import {
   PaymentStatus,
   IncomeSource,
   Employee,
-  EmployeeMonth
+  EmployeeMonth,
+  DailyOrders
 } from './types';
 import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
@@ -105,6 +106,7 @@ export default function App() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeMonths, setEmployeeMonths] = useState<EmployeeMonth[]>([]);
+  const [dailyOrders, setDailyOrders] = useState<DailyOrders[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Authentication check on startup
@@ -191,6 +193,16 @@ export default function App() {
       .getEmployeeMonths(activeMonthId)
       .then(setEmployeeMonths)
       .catch((err) => console.error('Error loading payroll month', err));
+  }, [currentUser, activeMonthId]);
+
+  // Daily orders load on their own too: a missing table never blocks the month
+  useEffect(() => {
+    if (!currentUser || !activeMonthId) return;
+    setDailyOrders([]);
+    dbService
+      .getDailyOrders(activeMonthId)
+      .then(setDailyOrders)
+      .catch((err) => console.error('Error loading daily orders', err));
   }, [currentUser, activeMonthId]);
 
   // Show the overdue-payment toast once per app load, when data first reveals
@@ -500,8 +512,23 @@ export default function App() {
           return [...prev, saved];
         }
       });
+      return true;
     } catch (err) {
       console.error(err);
+      pushToast('שמירת ההכנסה נכשלה, נסה שוב', { tone: 'error', duration: 6000 });
+      return false;
+    }
+  };
+
+  const handleSaveDailyOrders = async (row: { month_id: string; date: string; orders: number }) => {
+    try {
+      const saved = await dbService.saveDailyOrders(row);
+      setDailyOrders((prev) => (prev.some((d) => d.date === saved.date) ? prev.map((d) => (d.date === saved.date ? saved : d)) : [...prev, saved]));
+      return true;
+    } catch (err) {
+      console.error(err);
+      pushToast('שמירת מספר ההזמנות נכשלה. צריך להריץ את פקודת ה-SQL של ההזמנות היומיות.', { tone: 'error', duration: 8000 });
+      return false;
     }
   };
 
@@ -910,7 +937,7 @@ export default function App() {
                 {activePage === 'debts' && <ODebts debts={debts} {...pageMonth} onSaveDebt={handleSaveDebt} onDeleteDebt={handleDeleteDebt} />}
 
                 {activePage === 'income' && (
-                  <OIncome incomeEntries={incomeEntries} {...pageMonth} onSaveIncome={handleSaveIncomeEntry} onDeleteIncome={handleDeleteIncomeEntry} />
+                  <OIncome incomeEntries={incomeEntries} dailyOrders={dailyOrders} {...pageMonth} onSaveIncome={handleSaveIncomeEntry} onDeleteIncome={handleDeleteIncomeEntry} onSaveDailyOrders={handleSaveDailyOrders} />
                 )}
 
                 {activePage === 'deliveries' && (

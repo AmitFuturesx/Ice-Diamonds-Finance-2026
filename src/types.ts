@@ -52,6 +52,14 @@ export interface IncomeEntry {
   date: string;
 }
 
+// Orders per day (daily income report). The money of the day lives in income_entries (channel 'יומי').
+export interface DailyOrders {
+  id: string;
+  month_id: string;
+  date: string; // YYYY-MM-DD
+  orders: number;
+}
+
 export interface Delivery {
   id: string;
   month_id: string;
