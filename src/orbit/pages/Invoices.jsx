@@ -50,6 +50,57 @@ async function shrinkImage(file) {
   }
 }
 
+const DRAFT_STATE = {
+  new: { label: 'ממתינה לאישור', cls: 'is-done' },
+  failed: { label: 'מורנינג לא הצליחה לקרוא', cls: 'is-failed' },
+  declined: { label: 'נדחתה', cls: 'is-failed' }
+}
+
+/** What morning actually holds: the latest expense drafts and their status, straight from its API. */
+function MorningCheck() {
+  const [state, setState] = useState({ loading: false, error: '', items: null })
+  const load = async () => {
+    setState((s) => ({ ...s, loading: true, error: '' }))
+    const res = await dbService.getMorningDrafts(7)
+    setState({ loading: false, error: res.ok ? '' : res.error || 'הבדיקה נכשלה', items: res.ok ? res.items || [] : null })
+  }
+  return (
+    <section className="card card-pad card-in" style={{ '--d': 6 }}>
+      <CardHead title="מה מורנינג קיבלה" sub="הטיוטות האחרונות כפי שהן במורנינג, משבוע אחרון" icon="refresh">
+        <button type="button" className="btn btn--white btn--sm" onClick={load} disabled={state.loading}>
+          <Icon name="refresh" /> {state.loading ? 'בודק...' : state.items ? 'רענון' : 'בדיקה מול מורנינג'}
+        </button>
+      </CardHead>
+      {state.error && <p className="ice-inv-alert">{state.error}</p>}
+      {state.items && state.items.length === 0 && <p className="ice-inv-note">אין טיוטות הוצאה במורנינג מהשבוע האחרון.</p>}
+      {state.items && state.items.length > 0 && (
+        <ul className="ice-need-list">
+          {state.items.map((d) => {
+            const st = DRAFT_STATE[d.status] || { label: `סטטוס ${d.status}`, cls: 'is-skipped' }
+            return (
+              <li key={d.id} className="ice-need-row ice-draft-row">
+                <span className="ice-need-ic" style={{ '--tone': '#2c6d85' }}>
+                  <Icon name="file" />
+                </span>
+                <div className="ice-need-main">
+                  <p className="ice-pop-name">
+                    <b>{d.supplier || 'ספק עוד לא זוהה'}</b>
+                    {d.amount != null && <span className="ice-pop-amt">{ils(d.amount)}</span>}
+                  </p>
+                  <span className="ice-pop-where">{d.created ? `הועלתה ${when(d.created)}` : ''}</span>
+                </div>
+                <div className="ice-need-state">
+                  <span className={`ice-need-badge ${st.cls}`}>{st.label}</span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 export default function Invoices(props) {
   const {
     notify,
@@ -388,6 +439,8 @@ export default function Invoices(props) {
         <input ref={pickRef} type="file" accept="application/pdf,image/*" multiple hidden onChange={onPicked} />
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={onPicked} />
       </section>
+
+      <MorningCheck />
 
       {/* ---------- 3. what was sent ---------- */}
       <section className="card card-pad card-in" style={{ '--d': 6 }}>

@@ -735,6 +735,24 @@ export const dbService = {
    * The morning API key stays on the server; the browser only proves it is signed in.
    * Demo mode (no Supabase) pretends: a file whose name contains "fail" fails, the rest succeed.
    */
+  /** The latest expense drafts as morning sees them (status: new / failed / declined). Read only. */
+  async getMorningDrafts(days = 7): Promise<{ ok: boolean; error?: string; items?: { id: string; status: string; created: string | null; supplier: string | null; amount: number | null; date: string | null }[] }> {
+    if (!(isLiveSupabase && supabaseClient)) {
+      await new Promise((r) => setTimeout(r, 500));
+      return { ok: true, items: [{ id: 'demo1', status: 'new', created: new Date().toISOString(), supplier: 'ספק לדוגמה', amount: 800, date: null }] };
+    }
+    const { data } = await supabaseClient.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, error: 'צריך להתחבר מחדש למערכת' };
+    try {
+      const r = await fetch(`/api/morning-drafts?days=${days}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await r.json().catch(() => null);
+      return res && typeof res.ok === 'boolean' ? res : { ok: false, error: `השרת לא הגיב כמו שצריך (${r.status})` };
+    } catch {
+      return { ok: false, error: 'אין חיבור לאינטרנט או שהשרת לא זמין' };
+    }
+  },
+
   async sendInvoiceToMorning(file: File): Promise<{ ok: boolean; error?: string; key?: string | null }> {
     if (!(isLiveSupabase && supabaseClient)) {
       await new Promise((r) => setTimeout(r, 900 + Math.random() * 700));
