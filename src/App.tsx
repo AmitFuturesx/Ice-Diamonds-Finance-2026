@@ -24,6 +24,7 @@ import ODebts from './orbit/pages/Debts';
 import OIncome from './orbit/pages/Income';
 import ODeliveries from './orbit/pages/Deliveries';
 import OEmployees from './orbit/pages/Employees';
+import OInvoices from './orbit/pages/Invoices';
 import CommandPalette, { PaletteItem } from './components/CommandPalette';
 import { useToasts, ToastViewport } from './components/Toasts';
 
@@ -36,7 +37,7 @@ import {
   User, 
   Plus,
   Coins, 
-  Truck, 
+  Truck, Upload, 
   CreditCard, 
   FileText, 
   Flame, 
@@ -56,7 +57,7 @@ import {
 // Undo window before a delete is actually sent to the database
 const UNDO_MS = 6000;
 
-type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries' | 'employees';
+type ActivePage = 'dashboard' | 'fixed_expenses' | 'variable_expenses' | 'debts' | 'income' | 'deliveries' | 'employees' | 'invoices';
 
 // Hebrew month names, indexed by month number - 1
 const HEBREW_MONTHS = [
@@ -610,6 +611,7 @@ export default function App() {
     { id: 'variable_expenses', label: 'הוצאות משתנות', icon: CreditCard, oicon: 'card', group: 'כספים', desc: 'רכש, ספקים ותשלומים משתנים' },
     { id: 'debts', label: 'חובות והלוואות', icon: Landmark, oicon: 'bank', group: 'כספים', desc: 'הלוואות, יתרות וכמה תשלומים נותרו' },
     { id: 'deliveries', label: 'שליחויות', icon: Truck, oicon: 'truck', group: 'כספים', desc: 'משלוחים והפצה, נטו וכולל מע״מ' },
+    { id: 'invoices', label: 'חשבוניות', icon: Upload, oicon: 'upload', group: 'כספים', desc: 'העלאת חשבוניות וקבלות ישר למורנינג' },
     { id: 'employees', label: 'עובדים ושכר', icon: User, oicon: 'users', group: 'צוות', desc: 'שכר, עמלות וסטטוס תשלום לכל איש צוות' },
   ];
   const navGroups = ['ראשי', 'כספים', 'צוות'];
@@ -914,6 +916,8 @@ export default function App() {
                 {activePage === 'deliveries' && (
                   <ODeliveries deliveries={deliveries} {...pageMonth} onSaveDelivery={handleSaveDelivery} onDeleteDelivery={handleDeleteDelivery} />
                 )}
+
+                {activePage === 'invoices' && <OInvoices notify={pushToast} userEmail={currentUser?.email} />}
 
                 {activePage === 'employees' && (
                   <OEmployees

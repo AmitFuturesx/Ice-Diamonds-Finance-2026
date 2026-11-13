@@ -9,7 +9,8 @@ import {
   PaymentStatus,
   IncomeSource,
   Employee,
-  EmployeeMonth
+  EmployeeMonth,
+  InvoiceUpload
 } from '../types';
 
 // Retrieve environment variables
@@ -671,5 +672,86 @@ export const dbService = {
     const created = { ...row, id: 'em_' + Math.random().toString(36).slice(2, 11) } as EmployeeMonth;
     saveToStorage('employee_months', [...list, created]);
     return created;
+  },
+
+  // ---------- Invoices → morning (expense drafts) ----------
+  // The list of what was sent (✓ / ✗). Files are not stored in the app.
+  async getInvoiceUploads(limit = 200): Promise<InvoiceUpload[]> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from('invoice_uploads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data as any) || [];
+    }
+    return getFromStorage<InvoiceUpload>('invoice_uploads')
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .slice(0, limit);
+  },
+
+  async saveInvoiceUpload(row: Partial<InvoiceUpload> & { file_name: string }): Promise<InvoiceUpload> {
+    if (isLiveSupabase && supabaseClient) {
+      const query = row.id
+        ? supabaseClient.from('invoice_uploads').update(row).eq('id', row.id)
+        : supabaseClient.from('invoice_uploads').insert([row]);
+      const { data, error } = await query.select();
+      if (error) throw error;
+      return data[0];
+    }
+    const list = getFromStorage<InvoiceUpload>('invoice_uploads');
+    if (row.id) {
+      const updated = list.map((x) => (x.id === row.id ? ({ ...x, ...row } as InvoiceUpload) : x));
+      saveToStorage('invoice_uploads', updated);
+      return updated.find((x) => x.id === row.id)!;
+    }
+    const created = {
+      status: 'pending',
+      error: null,
+      morning_key: null,
+      uploaded_by: null,
+      file_size: 0,
+      file_type: '',
+      ...row,
+      id: 'inv_' + Math.random().toString(36).slice(2, 11),
+      created_at: new Date().toISOString()
+    } as InvoiceUpload;
+    saveToStorage('invoice_uploads', [created, ...list]);
+    return created;
+  },
+
+  async deleteInvoiceUpload(id: string): Promise<void> {
+    if (isLiveSupabase && supabaseClient) {
+      const { error } = await supabaseClient.from('invoice_uploads').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    }
+    saveToStorage('invoice_uploads', getFromStorage<InvoiceUpload>('invoice_uploads').filter((x) => x.id !== id));
+  },
+
+  /**
+   * Send one file to morning through our server function (/api/morning-upload).
+   * The morning API key stays on the server; the browser only proves it is signed in.
+   * Demo mode (no Supabase) pretends: a file whose name contains "fail" fails, the rest succeed.
+   */
+  async sendInvoiceToMorning(file: File): Promise<{ ok: boolean; error?: string; key?: string | null }> {
+    if (!(isLiveSupabase && supabaseClient)) {
+      await new Promise((r) => setTimeout(r, 900 + Math.random() * 700));
+      return /fail/i.test(file.name) ? { ok: false, error: 'מצב הדגמה: שליחה לדוגמה שנכשלה' } : { ok: true, key: `demo/${file.name}` };
+    }
+    const { data } = await supabaseClient.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, error: 'צריך להתחבר מחדש למערכת' };
+    const body = new FormData();
+    body.append('file', file, file.name);
+    try {
+      const r = await fetch('/api/morning-upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body });
+      const res = await r.json().catch(() => null);
+      if (res && typeof res.ok === 'boolean') return res;
+      return { ok: false, error: r.status === 413 ? 'הקובץ גדול מ-4MB' : `השרת לא הגיב כמו שצריך (${r.status})` };
+    } catch {
+      return { ok: false, error: 'אין חיבור לאינטרנט או שהשרת לא זמין' };
+    }
   }
 };

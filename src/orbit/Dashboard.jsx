@@ -227,6 +227,9 @@ export default function Dashboard(props) {
         }
       >
         <MonthBar months={months} value={activeMonthId} onChange={onChangeMonth} onAdd={onAddMonth} />
+        <button className="btn btn--primary" onClick={() => onNavigate?.('invoices')}>
+          <Icon name="upload" /> העלאת חשבונית
+        </button>
         <button className="btn btn--white" onClick={onExport} disabled={exporting}>
           <Icon name="download" /> {exporting ? 'מייצא...' : 'ייצוא לאקסל'}
         </button>

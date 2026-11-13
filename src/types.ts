@@ -97,6 +97,20 @@ export interface EmployeeMonth {
   notes: string;
 }
 
+// One file sent to morning (Green Invoice) as an expense draft — the ✓ / ✗ list on the invoices page
+export type InvoiceUploadStatus = 'pending' | 'sent' | 'failed';
+export interface InvoiceUpload {
+  id: string;
+  created_at: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  status: InvoiceUploadStatus;
+  error: string | null;
+  morning_key: string | null;
+  uploaded_by: string | null;
+}
+
 export interface FinancialSummary {
   totalIncome: number;
   totalFixedExpenses: number;

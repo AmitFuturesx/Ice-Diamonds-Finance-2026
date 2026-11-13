@@ -1,0 +1,233 @@
+/* ==================================================================
+   חשבוניות — upload block + the ✓ / ✗ list of what reached morning
+   ================================================================== */
+.ice-inv-top {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1.4rem;
+  align-items: stretch;
+}
+.ice-inv-kpis {
+  display: grid;
+  gap: 1.4rem;
+}
+
+/* ---------- drop zone ---------- */
+.ice-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 16rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  outline: 2px dashed rgb(44 109 133 / 0.28);
+  outline-offset: -0.9rem;
+  transition:
+    outline-color 0.2s,
+    background-color 0.2s,
+    scale 0.3s var(--spring);
+}
+.ice-drop.is-drag {
+  outline-color: var(--green-2);
+  background: var(--row-green);
+  scale: 1.01;
+}
+.ice-drop-ic {
+  width: 3.4rem;
+  height: 3.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 1.1rem;
+  background: var(--teal-soft);
+  color: var(--teal);
+  margin-bottom: 0.2rem;
+}
+.ice-drop-ic .icon {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+.ice-drop h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ice-drop p {
+  font-size: 0.95rem;
+  color: var(--ink-2);
+}
+.ice-drop small {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.ice-drop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0 0.2rem;
+}
+.ice-drop-actions .btn {
+  height: 2.75rem;
+  padding-inline: 1.3rem;
+  font-size: 0.95rem;
+}
+
+/* ---------- list ---------- */
+.ice-inv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+.ice-inv-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem 0.9rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 1.05rem;
+  background: var(--row-grey);
+}
+.ice-inv-row.is-sent {
+  background: var(--row-green);
+}
+.ice-inv-row.is-failed {
+  background: #fdeae8;
+}
+.ice-inv-mark {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--muted-2);
+}
+.ice-inv-mark .icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  stroke-width: 2.6;
+}
+.ice-inv-mark.is-sent {
+  background: var(--green-2);
+}
+.ice-inv-mark.is-failed {
+  background: var(--red);
+}
+.ice-inv-mark.is-pending {
+  background: #fff;
+}
+.ice-spin {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  border: 2.5px solid var(--teal-soft);
+  border-top-color: var(--teal);
+  animation: iceSpin 0.8s linear infinite;
+}
+@keyframes iceSpin {
+  to {
+    rotate: 1turn;
+  }
+}
+.ice-inv-main {
+  min-width: 0;
+}
+.ice-inv-main b {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-inv-main span {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.ice-inv-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.ice-inv-ok,
+.ice-inv-wait,
+.ice-inv-err {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.ice-inv-ok {
+  color: var(--green-3);
+}
+.ice-inv-wait {
+  color: var(--teal);
+}
+.ice-inv-err {
+  color: #c4423b;
+  max-width: 22rem;
+}
+.ice-inv-alert {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: #fdf1e2;
+  color: #9a5a12;
+  font-size: 0.9rem;
+}
+.ice-inv-note {
+  margin-top: 1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .ice-inv-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ice-inv-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 768px) {
+  .ice-cam {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .ice-drop {
+    min-height: 0;
+    padding: 1.6rem 1.1rem;
+  }
+  .ice-drop-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .ice-drop-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ice-inv-kpis {
+    gap: 0.8rem;
+  }
+  .ice-inv .card-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.8rem;
+  }
+  .ice-inv-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0.75rem 0.8rem;
+  }
+  .ice-inv-state {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+  }
+}
