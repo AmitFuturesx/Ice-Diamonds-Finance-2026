@@ -13,6 +13,7 @@ import {
 } from './types';
 import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
+import { computePay, VAT_RATE } from './lib/payroll';
 import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
 import OrbitDashboard from './orbit/Dashboard';
@@ -529,6 +530,8 @@ export default function App() {
       });
     } catch (err) {
       console.error(err);
+      const missingStatus = 'status' in item && /status/i.test(String((err as { message?: string })?.message || ''));
+      pushToast(missingStatus ? 'סימון תשלום לשליחויות דורש הרצת פקודת SQL קצרה (deliveries_status) ב-Supabase' : 'שמירת השליחות נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
     }
   };
 
@@ -586,13 +589,6 @@ export default function App() {
     }
   };
 
-  // Layout Dynamic Calculations (recalculates immediately on any input addition or edit)
-  const totalIncomeCalc = incomeEntries.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-  const totalExpensesCalc = 
-    fixedExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) +
-    variableExpenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0) +
-    debts.reduce((acc, curr) => acc + (Number(curr.monthly_payment) || 0), 0);
-  const netBalanceCalc = totalIncomeCalc - totalExpensesCalc;
   const activeMonthObject = months.find(m => m.id === activeMonthId);
   const activeMonthName = activeMonthObject ? `${activeMonthObject.name} ${activeMonthObject.year}` : 'טוען...';
 
@@ -608,14 +604,24 @@ export default function App() {
   ];
   const navGroups = ['ראשי', 'כספים', 'צוות'];
 
-  // Paid vs. still open this month (fixed + variable + debt installments) — sidebar card + badges
+  // Paid vs. still open this month — same five groups as the dashboard blocks
+  // (fixed, variable, debt installments, payroll, deliveries incl. VAT) — sidebar card + badges
   const unpaidOf = (list: { status?: string }[]) => list.filter((x) => (x.status || 'לא שולם') !== 'שולם').length;
-  const paidAll =
-    fixedExpenses.filter((e) => e.status === 'שולם').reduce((a, e) => a + (Number(e.amount) || 0), 0) +
-    variableExpenses.filter((e) => e.status === 'שולם').reduce((a, e) => a + (Number(e.amount) || 0), 0) +
-    debts.filter((d) => d.status === 'שולם').reduce((a, d) => a + (Number(d.monthly_payment) || 0), 0);
-  const leftAll = totalExpensesCalc - paidAll;
-  const paidPctAll = totalExpensesCalc > 0 ? Math.round((paidAll / totalExpensesCalc) * 100) : 0;
+  const empMonthMap: Record<string, EmployeeMonth> = {};
+  employeeMonths.forEach((m) => (empMonthMap[m.employee_id] = m));
+  const owedRows: { amount: number; paid: boolean }[] = [
+    ...fixedExpenses.map((e) => ({ amount: Number(e.amount) || 0, paid: e.status === 'שולם' })),
+    ...variableExpenses.map((e) => ({ amount: Number(e.amount) || 0, paid: e.status === 'שולם' })),
+    ...debts.map((d) => ({ amount: Number(d.monthly_payment) || 0, paid: d.status === 'שולם' })),
+    ...employees
+      .filter((e) => e.active !== false)
+      .map((e) => ({ amount: computePay(e, empMonthMap[e.id], employees, empMonthMap).total, paid: empMonthMap[e.id]?.status === 'שולם' })),
+    ...deliveries.map((d) => ({ amount: (Number(d.price) || 0) * (1 + VAT_RATE), paid: d.status === 'שולם' }))
+  ];
+  const owedAll = owedRows.reduce((a, r) => a + r.amount, 0);
+  const paidAll = owedRows.filter((r) => r.paid).reduce((a, r) => a + r.amount, 0);
+  const leftAll = owedAll - paidAll;
+  const paidPctAll = owedAll > 0 ? Math.round((paidAll / owedAll) * 100) : 0;
   const navBadges: Record<string, { n: number; hot?: boolean } | undefined> = {
     fixed_expenses: unpaidOf(fixedExpenses) ? { n: unpaidOf(fixedExpenses) } : undefined,
     variable_expenses: unpaidOf(variableExpenses) ? { n: unpaidOf(variableExpenses) } : undefined,
@@ -858,6 +864,9 @@ export default function App() {
                     onSaveFixedExpense={handleSaveFixedExpense}
                     onSaveVariableExpense={handleSaveVariableExpense}
                     onSaveDebt={handleSaveDebt}
+                    deliveries={deliveries}
+                    onSaveDelivery={handleSaveDelivery}
+                    onSaveEmployeeMonth={handleSaveEmployeeMonth}
                     employees={employees}
                     employeeMonths={employeeMonths}
                     onNavigate={(p: ActivePage) => setActivePage(p)}

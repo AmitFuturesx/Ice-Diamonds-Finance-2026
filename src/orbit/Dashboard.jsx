@@ -1,15 +1,18 @@
 /* ------------------------------------------------------------------
-   לוח בקרה — the Orbit home board, fed with Ice Diamonds' month.
-   Column 1: title + month, cash-flow chart, donut for the chosen billing day, export chip + peeking folder.
-   Column 2: expense folders (fixed / variable), the green balance card, billing-day table.
-   Column 3: search, "לשלם עכשיו" task cards, payroll rings, income by source.
+   לוח בקרה — the practical board (Amit, Nov 2026):
+   1. five category blocks (fixed, variable, payroll, debts, deliveries);
+      each one splits into total / left to pay / paid, and every part opens a popup list
+   2. the month's balance: income, expenses, paid, left to pay, profit (income − expenses)
+   3. payment days (10 / 15 / 19 / unknown) → popup of who is still unpaid and how patient they are
+   4. cash flow over time + income by source
 ------------------------------------------------------------------- */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Icon from './Icon'
-import { BarChart, Delta, Drawer, DrawerHead, Empty, Highlight, MoodPill, Segmented, Select, StatusPill, Avatar, nextMood, nextStatus } from './kit'
-import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, useDismiss, useEnter, useFlip, useFontsReady, useSize, useStable, useTween } from './lib'
-import { computePay } from '../lib/payroll'
+import { BarChart, Delta, MOODS, MoodPill, PageHead, Pill, Segmented, StatusPill, nextMood, nextStatus } from './kit'
+import { compact, ils, ilsK, monotone, num, pctChange, placePill, toArea, useCountUp, useEnter, useFontsReady, useSize, useStable, useTween } from './lib'
+import { computePay, VAT_RATE } from '../lib/payroll'
 import { dbService } from '../lib/supabase'
+import { Modal, MonthBar } from './pages/common'
 
 const SHORT_MONTH = ['', 'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳']
 const SOURCES = [
@@ -19,19 +22,61 @@ const SOURCES = [
   { id: 'העברה בנקאית', short: 'העברה' },
   { id: 'משולם / GROW', short: 'GROW' }
 ]
-const DAYS = [
-  { key: '10', label: '10 לחודש' },
-  { key: '15', label: '15 לחודש' },
-  { key: '19', label: '19 לחודש' },
-  { key: 'unknown', label: 'תאריך לא ידוע' }
+const CATS = [
+  { id: 'fixed', title: 'הוצאות קבועות', icon: 'receipt', tone: '#2c6d85', page: 'fixed_expenses' },
+  { id: 'variable', title: 'הוצאות משתנות', icon: 'card', tone: '#a65ad6', page: 'variable_expenses' },
+  { id: 'payroll', title: 'עובדים ושכר', icon: 'users', tone: '#3f9163', page: 'employees' },
+  { id: 'debt', title: 'חובות והלוואות', icon: 'bank', tone: '#e0892a', page: 'debts' },
+  { id: 'delivery', title: 'שליחויות', icon: 'truck', tone: '#3a87a0', page: 'deliveries' }
 ]
-const SOURCE_LABEL = { fixed: 'הוצאה קבועה', variable: 'הוצאה משתנה', debt: 'החזר חוב' }
-const MOOD_RANK = { angry: 0, neutral: 1, happy: 2 }
+const CAT = Object.fromEntries(CATS.map((c) => [c.id, c]))
+const DAYS = [
+  { key: '10', dn: 10, label: '10 לחודש' },
+  { key: '15', dn: 15, label: '15 לחודש' },
+  { key: '19', dn: 19, label: '19 לחודש' },
+  { key: 'unknown', dn: null, label: 'תאריך לא ידוע' }
+]
+const DAY_LABEL = Object.fromEntries(DAYS.map((d) => [d.key, d.label]))
 const DAY_ORDER = { 10: 0, 15: 1, 19: 2, unknown: 3 }
-const MOOD_TONE = { angry: 'peach', neutral: 'blue', happy: 'green' }
-const monthLabel = (m) => (m ? (m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`) : '')
+const MOOD_RANK = { angry: 0, neutral: 1, happy: 2 }
+const PAID = 'שולם'
+const UNPAID = 'לא שולם'
+const FILTERS = [
+  { id: 'all', label: 'סה״כ לשלם' },
+  { id: 'left', label: 'נותר לשלם' },
+  { id: 'paid', label: 'שולם' }
+]
 
+const n0 = (v) => Number(v) || 0
+/** '1 פתוח' / '3 פתוחים' */
+const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`
+const isPaid = (o) => o.status === PAID
+const sumOf = (list) => list.reduce((a, o) => a + o.amount, 0)
 const bucketKey = (n) => (n == null || isNaN(n) ? 'unknown' : String([10, 15, 19].reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p))))
+const monthLabel = (m) => (m ? (m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`) : '')
+const fmtDate = (s) => {
+  if (!s) return ''
+  const p = String(s).split('-')
+  return p.length === 3 ? `${p[2]}/${p[1]}` : s
+}
+/** Totals of a list: everything, what is still open (incl. partly paid) and what is fully paid. */
+const stats = (list) => {
+  const paidL = list.filter(isPaid)
+  const leftL = list.filter((o) => !isPaid(o))
+  return { list, n: list.length, total: sumOf(list), paid: sumOf(paidL), left: sumOf(leftL), paidN: paidL.length, leftN: leftL.length }
+}
+/** Payroll of one month from its employee_months rows (0 when that month was never filled in). */
+const payrollOf = (employees, rows = []) => {
+  if (!rows.length) return 0
+  const by = Object.fromEntries(rows.map((r) => [r.employee_id, r]))
+  return employees.filter((e) => e.active !== false).reduce((a, e) => a + computePay(e, by[e.id], employees, by).total, 0)
+}
+
+/** Amount that counts up when it appears or changes. */
+function Money({ v, d = 0 }) {
+  const x = useCountUp(v, 1100, useEnter(d, 120))
+  return <>{ils(Math.round(x))}</>
+}
 
 /* ============================================================== */
 export default function Dashboard(props) {
@@ -40,6 +85,9 @@ export default function Dashboard(props) {
     variableExpenses = [],
     debts = [],
     incomeEntries = [],
+    deliveries = [],
+    employees = [],
+    employeeMonths = [],
     months = [],
     activeMonthId = '',
     onChangeMonth,
@@ -49,51 +97,65 @@ export default function Dashboard(props) {
     onSaveFixedExpense,
     onSaveVariableExpense,
     onSaveDebt,
-    employees = [],
-    employeeMonths = [],
+    onSaveDelivery,
+    onSaveEmployeeMonth,
     onNavigate,
     notify
   } = props
 
-  /* ---------- this month ---------- */
-  const sum = (arr, f) => arr.reduce((a, x) => a + (Number(x[f]) || 0), 0)
-  const totalIncome = sum(incomeEntries, 'amount')
-  const totalFixed = sum(fixedExpenses, 'amount')
-  const totalVariable = sum(variableExpenses, 'amount')
-  const totalDebts = sum(debts, 'monthly_payment')
-  const totalExpenses = totalFixed + totalVariable + totalDebts
-  const net = totalIncome - totalExpenses
+  const empMonthById = useMemo(() => Object.fromEntries(employeeMonths.map((m) => [m.employee_id, m])), [employeeMonths])
 
-  const obligations = useMemo(
+  /* ---------- every payment of the month, in one shape ---------- */
+  const items = useMemo(
     () => [
-      ...fixedExpenses.map((e) => ({ id: e.id, name: e.name, amount: Number(e.amount) || 0, status: e.status, dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN), source: 'fixed', mood: e.mood || 'happy', item: e })),
-      ...variableExpenses.map((e) => ({ id: e.id, name: e.name, amount: Number(e.amount) || 0, status: e.status, dayKey: bucketKey(e.date ? parseInt(e.date.split('-')[2], 10) : NaN), source: 'variable', mood: e.mood || 'happy', item: e })),
-      ...debts.map((d) => ({ id: d.id, name: d.name, amount: Number(d.monthly_payment) || 0, status: d.status || 'לא שולם', dayKey: bucketKey(d.payment_date ? parseInt(String(d.payment_date).split('-').pop(), 10) : NaN), source: 'debt', mood: d.mood || 'happy', item: d }))
+      ...fixedExpenses.map((e) => ({ uid: `f${e.id}`, cat: 'fixed', name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN), mood: e.mood || 'happy', raw: e })),
+      ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
+      ...employees
+        .filter((e) => e.active !== false)
+        .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', name: e.name, sub: e.role, amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),
+      ...debts.map((d) => ({ uid: `d${d.id}`, cat: 'debt', name: d.name, amount: n0(d.monthly_payment), status: d.status || UNPAID, dayKey: bucketKey(d.payment_date ? parseInt(String(d.payment_date).split('-').pop(), 10) : NaN), mood: d.mood || 'happy', raw: d })),
+      ...deliveries.map((d) => ({ uid: `s${d.id}`, cat: 'delivery', name: `${d.route_from} ← ${d.route_to}`, sub: fmtDate(d.date), amount: n0(d.price) * (1 + VAT_RATE), status: d.status || UNPAID, raw: d }))
     ],
-    [fixedExpenses, variableExpenses, debts]
+    [fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries]
   )
+
   const save = useCallback(
     (o, patch) => {
-      if (o.source === 'fixed') onSaveFixedExpense?.({ ...o.item, ...patch })
-      if (o.source === 'variable') onSaveVariableExpense?.({ ...o.item, ...patch })
-      if (o.source === 'debt') onSaveDebt?.({ ...o.item, ...patch })
+      const r = o.raw
+      if (o.cat === 'fixed') return onSaveFixedExpense?.({ ...r, ...patch })
+      if (o.cat === 'variable') return onSaveVariableExpense?.({ ...r, ...patch })
+      if (o.cat === 'debt') return onSaveDebt?.({ ...r, ...patch })
+      if (o.cat === 'delivery') return onSaveDelivery?.({ ...r, ...patch })
+      if (o.cat === 'payroll') {
+        const m = empMonthById[r.id]
+        return onSaveEmployeeMonth?.({ employee_id: r.id, month_id: activeMonthId, hours: m?.hours || 0, deals_count: m?.deals_count || 0, deals_amount: m?.deals_amount || 0, status: m?.status || UNPAID, notes: m?.notes || '', ...patch })
+      }
+      return undefined
     },
-    [onSaveFixedExpense, onSaveVariableExpense, onSaveDebt]
+    [onSaveFixedExpense, onSaveVariableExpense, onSaveDebt, onSaveDelivery, onSaveEmployeeMonth, empMonthById, activeMonthId]
   )
-  const markPaid = (o) => {
+  const setStatus = (o, next) => {
     const prev = o.status
-    save(o, { status: 'שולם' })
-    notify?.(`סומן כשולם: ${o.name}`, { tone: 'success', duration: 7000, action: { label: 'בטל', run: () => save(o, { status: prev }) } })
+    save(o, { status: next })
+    if (next === PAID) notify?.(`סומן כשולם: ${o.name}`, { tone: 'success', duration: 7000, action: { label: 'בטל', run: () => save(o, { status: prev }) } })
   }
+  const togglePaid = (o) => setStatus(o, isPaid(o) ? UNPAID : PAID)
+  const cycleStatus = (o) => setStatus(o, nextStatus(o.status))
+  const cycleMood = (o) => save(o, { mood: nextMood(o.mood) })
 
+  /* ---------- numbers ---------- */
+  const cats = CATS.map((c) => ({ ...c, ...stats(items.filter((o) => o.cat === c.id)) }))
+  const all = stats(items)
+  const income = incomeEntries.reduce((a, e) => a + n0(e.amount), 0)
+  const profit = income - all.total
+  const dated = items.filter((o) => o.dayKey)
   const days = DAYS.map((d) => {
-    const items = obligations.filter((o) => o.dayKey === d.key)
-    const total = items.reduce((a, o) => a + o.amount, 0)
-    const left = items.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0)
-    return { ...d, items, total, left, paid: total - left, open: items.filter((o) => o.status !== 'שולם').length }
+    const s = stats(dated.filter((o) => o.dayKey === d.key))
+    const open = s.list.filter((o) => !isPaid(o))
+    return { ...d, ...s, angry: open.filter((o) => o.mood === 'angry').length, neutral: open.filter((o) => o.mood === 'neutral').length, calm: open.filter((o) => o.mood === 'happy').length }
   })
 
-  /* ---------- history ---------- */
+  /* ---------- history (cash-flow chart) ---------- */
   const sorted = useMemo(() => [...months].sort((a, b) => a.year - b.year || a.month_number - b.month_number), [months])
   const activeIdx = sorted.findIndex((m) => m.id === activeMonthId)
   const activeMonth = sorted[activeIdx]
@@ -112,209 +174,375 @@ export default function Dashboard(props) {
     }
   }, [idsKey])
   const series = window12.map((m) => {
-    const t = m.id === activeMonthId ? { income: totalIncome, fixed: totalFixed, variable: totalVariable, debts: totalDebts } : hist[m.id] || { income: 0, fixed: 0, variable: 0, debts: 0 }
-    const exp = t.fixed + t.variable + t.debts
-    return { m, label: SHORT_MONTH[m.month_number] || m.name, income: t.income, expenses: exp, net: t.income - exp }
+    if (m.id === activeMonthId) return { m, label: SHORT_MONTH[m.month_number] || m.name, income, expenses: all.total, net: profit }
+    const t = hist[m.id] || {}
+    const exp = n0(t.fixed) + n0(t.variable) + n0(t.debts) + n0(t.deliveries) * (1 + VAT_RATE) + payrollOf(employees, t.staff)
+    return { m, label: SHORT_MONTH[m.month_number] || m.name, income: n0(t.income), expenses: exp, net: n0(t.income) - exp }
   })
   const prev = series.length > 1 ? series[series.length - 2] : null
 
-  /* ---------- search ---------- */
-  const [query, setQuery] = useState('')
-  const q = query.trim().toLowerCase()
+  /* today, only when the open month is the calendar month */
+  const now = new Date()
+  const isThisMonth = activeMonth && activeMonth.year === now.getFullYear() && activeMonth.month_number === now.getMonth() + 1
+  const today = isThisMonth ? now.getDate() : null
 
-  /* ---------- drawers ---------- */
-  const [drawer, setDrawer] = useState(null) // { title, sub, items }
-  const [selectedDay, setSelectedDay] = useState(() => (days.find((d) => d.left > 0) || days[0]).key)
-  const day = days.find((d) => d.key === selectedDay) || days[0]
-  const openDay = (d) => setDrawer({ kind: 'day', key: d.key })
-  const drawerItems = drawer
-    ? drawer.kind === 'day'
-      ? obligations.filter((o) => o.dayKey === drawer.key).sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם') || b.amount - a.amount)
-      : obligations.filter((o) => o.source === drawer.key).sort((a, b) => Number(a.status === 'שולם') - Number(b.status === 'שולם') || DAY_ORDER[a.dayKey] - DAY_ORDER[b.dayKey])
-    : []
-
-  /* ---------- folders (categories) ---------- */
-  const folder = (source, title, scope, tone, page) => {
-    const items = obligations.filter((o) => o.source === source)
-    const total = items.reduce((a, o) => a + o.amount, 0)
-    const paidN = items.filter((o) => o.status === 'שולם').length
-    const left = items.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0)
-    const status = !items.length ? 'empty' : left === 0 ? 'closed' : paidN > 0 || items.some((o) => o.status === 'שולם חלקית') ? 'review' : 'pending'
-    return { id: source, title, scope, tone, page, total, left, count: items.length, paidN, status }
-  }
-  const folders = {
-    fixed: folder('fixed', 'הוצאות קבועות', 'כל חודש', 'white', 'fixed_expenses'),
-    variable: folder('variable', 'הוצאות משתנות', 'החודש', 'white', 'variable_expenses'),
-    debt: folder('debt', 'חובות והלוואות', 'החזרים', 'cream', 'debts')
-  }
-
-  /* ---------- payroll ---------- */
-  const empMonthById = {}
-  employeeMonths.forEach((m) => (empMonthById[m.employee_id] = m))
-  const payroll = employees
-    .filter((e) => e.active !== false)
-    .map((e) => ({ emp: e, total: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || 'לא שולם' }))
-    .sort((a, b) => b.total - a.total)
-  const payrollTotal = payroll.reduce((a, r) => a + r.total, 0)
-
-  const monthOptions = [...sorted].reverse().map((m) => ({ id: m.id, label: monthLabel(m) }))
+  /* ---------- popup ---------- */
+  const [pop, setPop] = useState(null) // { kind: 'cat' | 'day' | 'all', key, filter }
+  const popData = (() => {
+    if (!pop) return null
+    if (pop.kind === 'cat') {
+      const c = cats.find((x) => x.id === pop.key)
+      return { title: c.title, icon: c.icon, tone: c.tone, s: c, page: c.page, showDay: c.id !== 'payroll' && c.id !== 'delivery' }
+    }
+    if (pop.kind === 'day') {
+      const d = days.find((x) => x.key === pop.key)
+      const moods = [d.angry && pl(d.angry, 'כועס', 'כועסים'), d.neutral && pl(d.neutral, 'העיר', 'העירו'), d.calm && pl(d.calm, 'רגוע', 'רגועים')].filter(Boolean).join(' · ')
+      return { title: d.key === 'unknown' ? 'תשלומים בלי תאריך' : `תשלומים ב־${d.label}`, icon: 'calendar', tone: '#2c6d85', s: d, sub: moods, showCat: true }
+    }
+    return { title: 'כל התשלומים של החודש', icon: 'wallet', tone: '#2c6d85', s: all, showCat: true, showDay: true }
+  })()
 
   return (
-    <div className="board">
-      {/* ---------- column 1 ---------- */}
-      <div className="col col-1">
-        <header className="page-head page-head--board ice-board-head">
-          <h1 aria-label="לוח בקרה">
-            <span className="word" aria-hidden="true">
-              לוח&nbsp;
+    <div className="page ice-dash">
+      <PageHead
+        title="לוח בקרה"
+        sub={
+          <>
+            {monthLabel(activeMonth)} · נותר לשלם <b>{ils(all.left)}</b> מתוך {ils(all.total)}
+          </>
+        }
+      >
+        <MonthBar months={months} value={activeMonthId} onChange={onChangeMonth} onAdd={onAddMonth} />
+        <button className="btn btn--white" onClick={onExport} disabled={exporting}>
+          <Icon name="download" /> {exporting ? 'מייצא...' : 'ייצוא לאקסל'}
+        </button>
+      </PageHead>
+
+      {/* ---------- 1. category blocks ---------- */}
+      <section className="ice-row">
+        <div className="ice-row-head">
+          <h2 className="sec-title">תשלומים לפי קטגוריה</h2>
+          <p className="sec-sub">לחיצה על כל סכום פותחת את הרשימה</p>
+        </div>
+        <div className="ice-cats">
+          {cats.map((c, i) => (
+            <div key={c.id} className="ice-slot">
+              <CatBlock c={c} d={i} onOpen={(filter) => setPop({ kind: 'cat', key: c.id, filter })} onPage={() => onNavigate?.(c.page)} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ---------- 2. balance ---------- */}
+      <section className="ice-row">
+        <div className="ice-row-head">
+          <h2 className="sec-title">מאזן החודש</h2>
+          <p className="sec-sub">רווח = הכנסות פחות הוצאות</p>
+        </div>
+        <div className="card ice-bal card-in" style={{ '--d': 5 }}>
+          <button type="button" className="ice-bal-cell" style={{ '--tone': '#57b05c' }} onClick={() => onNavigate?.('income')}>
+            <span className="ice-bal-top">
+              <span className="ice-bal-ic">
+                <Icon name="coins" />
+              </span>
+              סה״כ הכנסות
             </span>
-            <span className="word" style={{ '--i': 1 }} aria-hidden="true">
-              בקרה
+            <b>
+              <Money v={income} d={5} />
+            </b>
+            <small>{incomeEntries.length} רשומות הכנסה</small>
+          </button>
+          <button type="button" className="ice-bal-cell" style={{ '--tone': '#a65ad6' }} onClick={() => setPop({ kind: 'all', filter: 'all' })}>
+            <span className="ice-bal-top">
+              <span className="ice-bal-ic">
+                <Icon name="wallet" />
+              </span>
+              סה״כ הוצאות
             </span>
-          </h1>
-          <div className="ice-month rv" style={{ '--i': 3 }}>
-            <Select value={activeMonthId} options={monthOptions} onChange={onChangeMonth} icon="calendar" label="חודש" align="end" />
-            <button type="button" className="icon-btn icon-btn--soft" onClick={onAddMonth} aria-label="הוספת חודש חדש" title="הוספת חודש חדש">
-              <Icon name="plus" />
-            </button>
+            <b>
+              <Money v={all.total} d={5} />
+            </b>
+            <small>{all.n} תשלומים ב־5 קטגוריות</small>
+          </button>
+          <button type="button" className="ice-bal-cell" style={{ '--tone': '#3f9163' }} onClick={() => setPop({ kind: 'all', filter: 'paid' })}>
+            <span className="ice-bal-top">
+              <span className="ice-bal-ic">
+                <Icon name="check" />
+              </span>
+              סה״כ שולם
+            </span>
+            <b>
+              <Money v={all.paid} d={5} />
+            </b>
+            <small>{all.total ? Math.round((all.paid / all.total) * 100) : 0}% מההוצאות</small>
+          </button>
+          <button type="button" className="ice-bal-cell" style={{ '--tone': '#e0892a' }} onClick={() => setPop({ kind: 'all', filter: 'left' })}>
+            <span className="ice-bal-top">
+              <span className="ice-bal-ic">
+                <Icon name="clock" />
+              </span>
+              סה״כ נותר לשלם
+            </span>
+            <b>
+              <Money v={all.left} d={5} />
+            </b>
+            <small>{pl(all.leftN, 'תשלום פתוח', 'תשלומים פתוחים')}</small>
+          </button>
+          <div className={`ice-bal-profit ${profit < 0 ? 'is-neg' : ''}`}>
+            <span className="ice-bal-top">
+              <span className="ice-bal-ic">
+                <Icon name={profit < 0 ? 'trendDown' : 'trendUp'} />
+              </span>
+              {profit < 0 ? 'הפסד החודש' : 'רווח החודש'}
+            </span>
+            <b>
+              <Money v={profit} d={5} />
+            </b>
+            <small>{income ? `${Math.round((profit / income) * 100)}% מההכנסות נשארו בעסק` : 'הכנסות פחות הוצאות'}</small>
           </div>
-        </header>
-        <CashFlow series={series} monthName={monthLabel(activeMonth)} totalIncome={totalIncome} />
-        <DayDonut day={day} />
-        <div className="col-foot rise" style={{ '--d': 6 }}>
-          <button className="ws-chip" onClick={onExport} disabled={exporting}>
-            <span className="ws-logo">
-              <Icon name="download" />
-            </span>
-            {exporting ? 'מייצא...' : `ייצוא ${monthLabel(activeMonth)} לאקסל`}
-          </button>
-          <button className="peek" onClick={() => setDrawer({ kind: 'source', key: 'debt' })} aria-label="פתיחת חובות והלוואות">
-            <Folder f={folders.debt} />
-          </button>
         </div>
-      </div>
+      </section>
 
-      {/* ---------- column 2 ---------- */}
-      <div className="col col-2">
-        <div className="files sect rise" id="sec-files" style={{ '--d': 1 }}>
-          {[0, 1].map((slot) => (
-            <span key={slot} className={`slot ${slot === 1 ? 'is-open' : ''}`} style={{ '--x': slot }} aria-hidden="true" />
-          ))}
-          {[folders.fixed, folders.variable].map((f, slot) => (
-            <Folder
-              key={f.id}
-              f={f}
-              className={slot === 1 ? 'is-lifted' : ''}
-              style={{ '--x': slot }}
-              role="button"
-              tabIndex={0}
-              onClick={() => setDrawer({ kind: 'source', key: f.id })}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setDrawer({ kind: 'source', key: f.id })}
-            />
+      {/* ---------- 3. payment days ---------- */}
+      <section className="ice-row">
+        <div className="ice-row-head">
+          <h2 className="sec-title">ימי תשלום</h2>
+          <p className="sec-sub">כמה נשאר לשלם בכל תאריך · הוצאות קבועות, משתנות וחובות</p>
+        </div>
+        <div className="ice-days">
+          {days.map((d, i) => (
+            <div key={d.key} className="ice-slot">
+              <DayBlock day={d} today={today} d={6 + i} onOpen={() => setPop({ kind: 'day', key: d.key, filter: 'left' })} />
+            </div>
           ))}
         </div>
-        <Balance series={series} net={net} income={totalIncome} expenses={totalExpenses} monthName={monthLabel(activeMonth)} onExport={onExport} />
-        <DaysTable days={days} selected={selectedDay} onSelect={setSelectedDay} onOpen={openDay} query={q} />
+      </section>
+
+      {/* ---------- 4. charts ---------- */}
+      <div className="split ice-charts">
+        <CashFlow series={series} monthName={monthLabel(activeMonth)} totalIncome={income} />
+        <IncomeFlow incomeEntries={incomeEntries} total={income} prevIncome={prev?.income} onOpen={() => onNavigate?.('income')} />
       </div>
 
-      {/* ---------- column 3 ---------- */}
-      <div className="col col-3">
-        <div className="search rise" style={{ '--d': 1 }}>
-          <Icon name="search" />
-          <input value={query} placeholder="חיפוש ספק או תשלום" aria-label="חיפוש ספק או תשלום" onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setQuery('')} />
-          {query ? (
-            <button className="search-clear" onClick={() => setQuery('')} aria-label="ניקוי חיפוש">
-              <Icon name="x" />
-            </button>
-          ) : (
-            <kbd>/</kbd>
-          )}
-        </div>
-        <PayNow obligations={obligations} query={q} onToggle={(o) => (o.status === 'שולם' ? save(o, { status: 'לא שולם' }) : markPaid(o))} onMood={(o) => save(o, { mood: nextMood(o.mood) })} />
-        <Payroll rows={payroll} total={payrollTotal} onOpen={() => onNavigate?.('employees')} />
-        <IncomeFlow incomeEntries={incomeEntries} total={totalIncome} prevIncome={prev?.income} onOpen={() => onNavigate?.('income')} />
-      </div>
-
-      {drawer && (
-        <Drawer label="פירוט תשלומים" onClose={() => setDrawer(null)}>
-          {(close) => {
-            const total = drawerItems.reduce((a, o) => a + o.amount, 0)
-            const left = drawerItems.filter((o) => o.status !== 'שולם').reduce((a, o) => a + o.amount, 0)
-            const title = drawer.kind === 'day' ? `תשלומים · ${DAYS.find((d) => d.key === drawer.key)?.label}` : folders[drawer.key]?.title
-            const page = drawer.kind === 'source' ? folders[drawer.key]?.page : null
-            return (
-              <>
-                <DrawerHead icon={drawer.kind === 'day' ? 'calendar' : 'folder'} title={title} sub={`${drawerItems.length} פריטים · סה״כ ${ils(total)} · נותר ${ils(left)}`} close={close} />
-                <ul className="ob-list">
-                  {drawerItems.map((o, i) => (
-                    <li key={o.source + o.id} className={`ob-row rv ${o.status === 'שולם' ? 'is-paid' : ''}`} style={{ '--i': i }}>
-                      <div className="ob-main">
-                        <b>{o.name}</b>
-                        <span>
-                          {SOURCE_LABEL[o.source]}
-                          {drawer.kind === 'source' ? ` · ${DAYS.find((d) => d.key === o.dayKey)?.label}` : ''}
-                        </span>
-                      </div>
-                      <b className="ob-amount">{ils(o.amount)}</b>
-                      <div className="ob-pills">
-                        <StatusPill status={o.status} onClick={() => save(o, { status: nextStatus(o.status) })} />
-                        <MoodPill mood={o.mood} onClick={() => save(o, { mood: nextMood(o.mood) })} />
-                      </div>
-                    </li>
-                  ))}
-                  {drawerItems.length === 0 && <Empty icon="check" title="אין תשלומים כאן" />}
-                </ul>
-                <p className="ob-hint">לחיצה על הסטטוס מחליפה אותו · לחיצה על הפרצוף מעדכנת כמה הספק לחוץ</p>
-                {page && (
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--block"
-                    onClick={() => {
+      {pop && popData && (
+        <Modal label={popData.title} onClose={() => setPop(null)} className="ice-pop">
+          {(close) => (
+            <ListPopup
+              data={popData}
+              filter={pop.filter}
+              onFilter={(filter) => setPop((p) => ({ ...p, filter }))}
+              close={close}
+              onToggle={togglePaid}
+              onStatus={cycleStatus}
+              onMood={cycleMood}
+              onPage={
+                popData.page
+                  ? () => {
                       close()
-                      onNavigate?.(page)
-                    }}
-                  >
-                    לעמוד {title}
-                    <Icon name="arrowRight" className="ob-arrow" />
-                  </button>
-                )}
-              </>
-            )
-          }}
-        </Drawer>
+                      onNavigate?.(popData.page)
+                    }
+                  : null
+              }
+            />
+          )}
+        </Modal>
       )}
     </div>
   )
 }
 
 /* ============================================================== */
-/* Folder card (template's FileCard)                                */
-function Folder({ f, className = '', style, ...rest }) {
-  const BADGE = { pending: 'לא שולם', review: 'שולם חלקית', closed: 'הכל שולם', empty: 'אין פריטים' }
-  const pct = f.count ? (f.paidN / f.count) * 100 : 0
+/* One category: total on top, then left-to-pay and paid tiles.   */
+function CatBlock({ c, d, onOpen, onPage }) {
+  const pct = c.total ? Math.round((c.paid / c.total) * 100) : 0
   return (
-    <div className={`file ${f.tone === 'cream' ? 'file--cream' : ''} ${className}`} style={style} {...rest}>
-      <span className="file-tab" aria-hidden="true" />
-      <div className="file-body">
-        <div className="file-meta">
-          <span>{f.scope}</span>
-          <span className="file-access">
-            <Icon name={f.id === 'debt' ? 'lock' : 'share'} />
-            {f.count} פריטים
-          </span>
+    <section className="card ice-cat card-in" style={{ '--d': d, '--tone': c.tone }}>
+      <button type="button" className="ice-cat-head" onClick={onPage} title={`לעמוד ${c.title}`}>
+        <span className="ice-cat-ic">
+          <Icon name={c.icon} />
+        </span>
+        <h3>{c.title}</h3>
+        <Icon name="chevronLeft" className="ice-cat-go" />
+      </button>
+      <div className="ice-cat-body">
+        <button type="button" className="ice-tile ice-tile--total" onClick={() => onOpen('all')}>
+          <span>סה״כ לשלם</span>
+          <b>
+            <Money v={c.total} d={d} />
+          </b>
+          <small>{pl(c.n, 'פריט', 'פריטים')}</small>
+        </button>
+        <div className="ice-bar" role="img" aria-label={`${pct}% שולם`}>
+          <i style={{ width: `${pct}%` }} />
         </div>
-        <h4>{f.title}</h4>
-        <p className="file-lender">{ils(f.total)} החודש</p>
-        <span className={`badge badge--${f.status === 'empty' ? 'closed' : f.status}`}>{f.status === 'pending' || f.status === 'review' ? `נותר ${ils(f.left)}` : BADGE[f.status]}</span>
-        <div className="file-foot">
-          <span className="bar">
-            <i style={{ width: `${pct}%` }} />
-          </span>
+        <button type="button" className={`ice-tile ice-tile--left ${c.left ? '' : 'is-zero'}`} onClick={() => onOpen('left')}>
           <span>
-            {f.paidN} מתוך {f.count} שולמו
+            <i className="dot" /> נותר לשלם
           </span>
-        </div>
+          <b>
+            <Money v={c.left} d={d} />
+          </b>
+          <small>{c.left ? pl(c.leftN, 'פתוח', 'פתוחים') : c.n ? 'הכל שולם' : '—'}</small>
+        </button>
+        <button type="button" className="ice-tile ice-tile--paid" onClick={() => onOpen('paid')}>
+          <span>
+            <i className="dot" /> שולם
+          </span>
+          <b>
+            <Money v={c.paid} d={d} />
+          </b>
+          <small>
+            {c.paidN} מתוך {c.n}
+          </small>
+        </button>
       </div>
+    </section>
+  )
+}
+
+/* ============================================================== */
+/* One payment day: what is still open on it, and who is pushing. */
+function DayBlock({ day, today, d, onOpen }) {
+  const pct = day.total ? Math.round((day.paid / day.total) * 100) : 0
+  let state = null
+  if (day.n && !day.left) state = { tone: 'green', text: 'הכל שולם' }
+  else if (today != null && day.dn != null && day.left) {
+    if (day.dn < today) state = { tone: 'red', text: 'התאריך עבר' }
+    else if (day.dn === today) state = { tone: 'orange', text: 'היום' }
+    else state = { tone: 'grey', text: `בעוד ${day.dn - today} ימים` }
+  }
+  return (
+    <button type="button" className="card ice-day card-in" style={{ '--d': d }} onClick={onOpen}>
+      <div className="ice-day-top">
+        <span className="ice-day-date">
+          {day.dn != null ? (
+            <>
+              <b>{day.dn}</b>
+              <small>לחודש</small>
+            </>
+          ) : (
+            <>
+              <b>?</b>
+              <small>תאריך לא ידוע</small>
+            </>
+          )}
+        </span>
+        {state && (
+          <Pill tone={state.tone} dot={false}>
+            {state.text}
+          </Pill>
+        )}
+      </div>
+      <span className="ice-day-label">נותר לשלם</span>
+      <b className="ice-day-amt">
+        <Money v={day.left} d={d} />
+      </b>
+      <div className="ice-bar">
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <p className="ice-day-foot">
+        מתוך {ils(day.total)} · {pl(day.leftN, 'פתוח', 'פתוחים')}
+      </p>
+      <div className="ice-day-moods">
+        {day.angry > 0 && (
+          <Pill tone="red" dot={false}>
+            {MOODS.angry.emoji} {pl(day.angry, 'כועס', 'כועסים')}
+          </Pill>
+        )}
+        {day.neutral > 0 && (
+          <Pill tone="orange" dot={false}>
+            {MOODS.neutral.emoji} {pl(day.neutral, 'העיר', 'העירו')}
+          </Pill>
+        )}
+        {day.calm > 0 && (
+          <Pill tone="green" dot={false}>
+            {MOODS.happy.emoji} {pl(day.calm, 'רגוע', 'רגועים')}
+          </Pill>
+        )}
+        {!day.leftN && <span className="ice-day-none">אין תשלומים פתוחים</span>}
+      </div>
+    </button>
+  )
+}
+
+/* ============================================================== */
+/* Popup list: three switchable totals, then the payments.         */
+function ListPopup({ data, filter, onFilter, close, onToggle, onStatus, onMood, onPage }) {
+  const { s } = data
+  const list = s.list
+    .filter((o) => (filter === 'left' ? !isPaid(o) : filter === 'paid' ? isPaid(o) : true))
+    .sort(
+      (a, b) =>
+        Number(isPaid(a)) - Number(isPaid(b)) ||
+        (MOOD_RANK[a.mood] ?? 3) - (MOOD_RANK[b.mood] ?? 3) ||
+        (DAY_ORDER[a.dayKey] ?? 4) - (DAY_ORDER[b.dayKey] ?? 4) ||
+        b.amount - a.amount
+    )
+  const value = { all: s.total, left: s.left, paid: s.paid }
+  const count = { all: pl(s.n, 'פריט', 'פריטים'), left: pl(s.leftN, 'פתוח', 'פתוחים'), paid: pl(s.paidN, 'שולם', 'שולמו') }
+  return (
+    <div className="ice-pop-in" style={{ '--tone': data.tone }}>
+      <header className="ice-pop-head">
+        <span className="ice-cat-ic">
+          <Icon name={data.icon} />
+        </span>
+        <div>
+          <h2>{data.title}</h2>
+          <p>{data.sub || `${s.n} תשלומים החודש`}</p>
+        </div>
+        <button type="button" className="icon-btn icon-btn--soft ice-pop-x" onClick={close} aria-label="סגירה">
+          <Icon name="x" />
+        </button>
+      </header>
+
+      <div className="ice-pop-tabs" role="tablist" aria-label="סינון">
+        {FILTERS.map((f) => (
+          <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} className={`ice-pop-tab ice-pop-tab--${f.id} ${filter === f.id ? 'is-on' : ''}`} onClick={() => onFilter(f.id)}>
+            <span>{f.label}</span>
+            <b>{ils(value[f.id])}</b>
+            <small>{count[f.id]}</small>
+          </button>
+        ))}
+      </div>
+
+      <ul className="ice-pop-list">
+        {list.map((o) => {
+          const done = isPaid(o)
+          const where = [data.showCat && CAT[o.cat].title, data.showDay && o.dayKey && DAY_LABEL[o.dayKey], o.sub].filter(Boolean).join(' · ')
+          return (
+            <li key={o.uid} className={`ice-pop-row ${done ? 'is-paid' : ''} ${o.mood && !done ? `is-${o.mood}` : ''}`}>
+              <button type="button" className={`ice-check ${done ? 'is-on' : ''}`} onClick={() => onToggle(o)} aria-pressed={done} aria-label={done ? `החזרה ללא שולם: ${o.name}` : `סימון כשולם: ${o.name}`} title={done ? 'החזרה ללא שולם' : 'סימון כשולם'}>
+                <Icon name="check" />
+              </button>
+              <div className="ice-pop-main">
+                <b>{o.name}</b>
+                {where && <span>{where}</span>}
+              </div>
+              <b className="ice-pop-amt">{ils(o.amount)}</b>
+              <div className="ice-pop-pills">
+                <StatusPill status={o.status} onClick={() => onStatus(o)} />
+                {o.mood && <MoodPill mood={o.mood} onClick={() => onMood(o)} />}
+              </div>
+            </li>
+          )
+        })}
+        {list.length === 0 && (
+          <li className="ice-pop-empty">
+            <Icon name={filter === 'left' ? 'check' : 'inbox'} />
+            {filter === 'left' ? 'הכל שולם כאן' : filter === 'paid' ? 'עוד לא שולם כלום' : 'אין תשלומים'}
+          </li>
+        )}
+      </ul>
+
+      <footer className="ice-pop-foot">
+        <p>הריבוע מסמן ששולם · הסטטוס עובר בין שולם, חלקית ולא שולם · הפרצוף מעדכן כמה הספק לחוץ</p>
+        {onPage && (
+          <button type="button" className="btn btn--primary" onClick={onPage}>
+            לעמוד {data.title}
+            <Icon name="arrowRight" className="ob-arrow" />
+          </button>
+        )}
+      </footer>
     </div>
   )
 }
@@ -528,356 +756,6 @@ function CashFlow({ series, monthName, totalIncome }) {
             </button>
           ))}
         </div>
-      </div>
-    </section>
-  )
-}
-
-/* ============================================================== */
-/* Donut for the chosen billing day (template's PortfolioDonut)     */
-const R = 66
-const C = 2 * Math.PI * R
-function DayDonut({ day }) {
-  const [hot, setHot] = useState(null)
-  const total = day.total || 1
-  const share = useTween(day.total ? day.paid / total : 0, 950, 0, useEnter(4, 120))
-  const left = useCountUp(day.left, 1100, useEnter(4, 150))
-  const paid = useCountUp(day.paid, 1100, useEnter(4, 220))
-  const paidLen = share * C
-  const pct = Math.round((hot === 'paid' ? share : 1 - share) * 100)
-  const seg = (id) => ({
-    className: `seg seg--${id} ${hot === id ? 'is-hot' : ''} ${hot && hot !== id ? 'is-dim' : ''}`,
-    onPointerEnter: () => setHot(id),
-    onPointerLeave: () => setHot(null)
-  })
-  return (
-    <section className="card donut-card sect rise" id="sec-donut" style={{ '--d': 4 }}>
-      <h3 key={day.key} className="donut-title swap-in">
-        תשלומי {day.label}
-      </h3>
-      <div className="donut-wrap">
-        <svg viewBox="0 0 200 200" className="donut" role="img" aria-label={`${day.label}: ${Math.round(share * 100)}% שולם`}>
-          <g transform="rotate(-90 100 100)">
-            <circle cx="100" cy="100" r={R} {...seg('bal')} strokeDasharray={`${Math.max(0, C - paidLen)} ${C}`} strokeDashoffset={-paidLen} />
-            <circle cx="100" cy="100" r={R} {...seg('paid')} strokeDasharray={`${paidLen} ${C}`} />
-          </g>
-        </svg>
-        <div className={`donut-center ${hot ? 'is-on' : ''}`} aria-hidden="true">
-          <b>{pct}%</b>
-          <span>{hot === 'paid' ? 'שולם' : 'נותר'}</span>
-        </div>
-      </div>
-      <div className="donut-legend">
-        <div onPointerEnter={() => setHot('bal')} onPointerLeave={() => setHot(null)}>
-          <span>נותר לשלם</span>
-          <b>
-            <i className="dot" style={{ background: 'var(--green)' }} />
-            {ils(left)}
-          </b>
-        </div>
-        <div onPointerEnter={() => setHot('paid')} onPointerLeave={() => setHot(null)}>
-          <span>כבר שולם</span>
-          <b>
-            <i className="dot" style={{ background: 'var(--teal)' }} />
-            {ils(paid)}
-          </b>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ============================================================== */
-/* Balance (template's Savings card)                                */
-const DECOR = Array.from({ length: 14 }, (_, i) => ({ label: '', income: 34 + i * 3.6 + Math.sin(i * 1.15) * 6 + Math.sin(i * 2.7) * 3, expenses: 0, net: 0, ghost: true }))
-function Balance({ series, net, income, expenses, monthName, onExport }) {
-  const [menu, setMenu] = useState(false)
-  const [showExp, setShowExp] = useState(true)
-  const [hover, setHover] = useState(null)
-  const menuRef = useRef(null)
-  const closeMenu = useCallback(() => setMenu(false), [])
-  useDismiss(menuRef, closeMenu, menu)
-
-  // With fewer than two months of real numbers the curve would be a bare triangle,
-  // so the card shows a calm decorative wave instead (no tooltip, no dashed line).
-  const enough = series.filter((s) => s.income || s.expenses).length >= 2
-  const rows = enough ? series : DECOR
-  const N = rows.length
-  const peak = Math.max(1, ...rows.map((r) => Math.max(r.income, r.expenses))) * 1.08
-  const areaT = useStable(rows.map((r) => (r.income / peak) * 100))
-  const lineT = useStable(rows.map((r) => (r.expenses / peak) * 100))
-  const area = useTween(areaT, 900)
-  const line = useTween(lineT, 900)
-  const inc = useCountUp(income, 1500, useEnter(3, 120))
-  const exp = useCountUp(expenses, 1500, useEnter(3, 160))
-  const total = useCountUp(net, 1700, useEnter(3, 200))
-
-  const chartRef = useRef(null)
-  const { w, h } = useSize(chartRef)
-  const x = (i) => (i * w) / Math.max(1, N - 1)
-  const y = (v) => h - (v / 100) * (h - 4)
-  const ptsA = (area.length === N ? area : areaT).map((v, i) => [x(i), y(v)])
-  const ptsL = (line.length === N ? line : lineT).map((v, i) => [x(i), y(v)])
-  const lineA = w && N > 1 ? monotone(ptsA) : ''
-  const lineL = w && N > 1 ? monotone(ptsL) : ''
-
-  return (
-    <section className="savings sect rise" id="sec-balance" style={{ '--d': 3 }}>
-      <div className="sec-head">
-        <h2 className="sec-title">מאזן החודש</h2>
-      </div>
-      <div className="card sv-card">
-        <div className="sv-stats">
-          <div>
-            <b>{ils(Math.round(inc))}</b>
-            <span>הכנסות</span>
-          </div>
-          <i className="sv-sep" />
-          <div>
-            <b>{ils(Math.round(exp))}</b>
-            <span>הוצאות</span>
-          </div>
-        </div>
-        <div
-          className="sv-chart"
-          ref={chartRef}
-          onPointerMove={(e) => {
-            if (!enough) return
-            const r = chartRef.current.getBoundingClientRect()
-            setHover(Math.max(0, Math.min(N - 1, Math.round(((e.clientX - r.left) / r.width) * (N - 1)))))
-          }}
-          onPointerLeave={() => setHover(null)}
-        >
-          {w > 0 && N > 1 && (
-            <svg width={w} height={h}>
-              <defs>
-                <linearGradient id="svFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#62b866" />
-                  <stop offset="0.55" stopColor="#4ea463" />
-                  <stop offset="1" stopColor="#3b8a63" />
-                </linearGradient>
-              </defs>
-              <path d={toArea(lineA, ptsA, h + 2)} fill="url(#svFill)" />
-              <path className="sv-edge" d={lineA} />
-              {showExp && enough && <path className="sv-dash" d={lineL} />}
-              {hover != null && !rows[hover]?.ghost && (
-                <g className="sv-focus">
-                  <line x1={ptsA[hover][0]} x2={ptsA[hover][0]} y1={ptsA[hover][1]} y2={h} />
-                  <circle cx={ptsA[hover][0]} cy={ptsA[hover][1]} r="5" />
-                </g>
-              )}
-            </svg>
-          )}
-        </div>
-        {hover != null && w > 0 && N > 1 && !rows[hover]?.ghost && (
-          <div className="sv-tip" style={{ left: ptsA[hover][0], bottom: h - ptsA[hover][1] + 12 }}>
-            {rows[hover].label} · נטו <b>{ils(rows[hover].net)}</b>
-          </div>
-        )}
-        <div className="sv-total">
-          <b>{ils(Math.round(total))}</b>
-          <span>מאזן נטו · {monthName}</span>
-        </div>
-        <div className="pop-anchor sv-menu" ref={menuRef}>
-          <button className="icon-btn icon-btn--light" onClick={() => setMenu((m) => !m)} aria-label="אפשרויות" aria-expanded={menu}>
-            <Icon name="dots" />
-          </button>
-          {menu && (
-            <div className="pop pop--menu pop--up" role="menu">
-              <button
-                className="menu-item"
-                role="menuitem"
-                onClick={() => {
-                  setMenu(false)
-                  onExport?.()
-                }}
-              >
-                <Icon name="download" /> ייצוא החודש לאקסל
-              </button>
-              <button
-                className="menu-item"
-                role="menuitem"
-                onClick={() => {
-                  setShowExp((t) => !t)
-                  setMenu(false)
-                }}
-              >
-                <Icon name="eye" /> {showExp ? 'הסתרת' : 'הצגת'} קו ההוצאות
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ============================================================== */
-/* Billing days table (template's Portfolios)                       */
-function DaysTable({ days, selected, onSelect, onOpen, query }) {
-  const bodyRef = useRef(null)
-  const rows = query ? days.filter((d) => d.items.some((o) => o.name.toLowerCase().includes(query))) : days
-  useFlip(bodyRef, rows.map((r) => r.key).join('|'))
-  const sel = days.find((d) => d.key === selected)
-  return (
-    <section className="pf sect rise" id="sec-days" style={{ '--d': 5 }}>
-      <div className="pf-head">
-        <h2 className="sec-title">ימי חיוב</h2>
-        <button className="link" onClick={() => sel && onOpen(sel)}>
-          פירוט {sel?.label}
-        </button>
-      </div>
-      <div className="pf-table" role="table" aria-label="ימי חיוב">
-        <div className="pf-row pf-row--head" role="row">
-          <span role="columnheader">יום</span>
-          <span role="columnheader">סה״כ</span>
-          <span role="columnheader">נותר</span>
-        </div>
-        <div className="pf-body" ref={bodyRef} role="rowgroup">
-          {rows.map((r, i) => (
-            <button
-              key={r.key}
-              data-flip={r.key}
-              role="row"
-              style={{ '--i': i }}
-              className={`pf-row ${i % 2 === 0 ? 'is-green' : 'is-grey'} ${selected === r.key ? 'is-selected' : ''}`}
-              onClick={() => onSelect(r.key)}
-              onDoubleClick={() => onOpen(r)}
-              aria-pressed={selected === r.key}
-            >
-              <span className="pf-name" role="cell">
-                {r.label}
-              </span>
-              <span role="cell">
-                {ilsK(r.total)}
-              </span>
-              <span role="cell">
-                {r.left ? ilsK(r.left) : 'שולם ✓'}
-              </span>
-            </button>
-          ))}
-          {rows.length === 0 && <p className="empty">אין תשלום שמתאים ל״{query}״</p>}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ============================================================== */
-/* Pay now (template's Tasks)                                        */
-function PayNow({ obligations, query, onToggle, onMood }) {
-  const listRef = useRef(null)
-  const [all, setAll] = useState(false)
-  const [overflow, setOverflow] = useState(false)
-  const today = new Date().getDate()
-  const list = obligations
-    .filter((o) => !query || o.name.toLowerCase().includes(query))
-    .sort(
-      (a, b) =>
-        Number(a.status === 'שולם') - Number(b.status === 'שולם') ||
-        (MOOD_RANK[a.mood] ?? 2) - (MOOD_RANK[b.mood] ?? 2) ||
-        DAY_ORDER[a.dayKey] - DAY_ORDER[b.dayKey] ||
-        b.amount - a.amount
-    )
-  const open = obligations.filter((o) => o.status !== 'שולם').length
-  useFlip(listRef, list.map((o) => `${o.id}${o.status}`).join('|'))
-  const shape = `${list.length}|${all}`
-  useLayoutEffect(() => {
-    const el = listRef.current
-    if (el) setOverflow(el.scrollHeight > el.clientHeight + 4)
-  }, [shape])
-
-  return (
-    <section className="card tasks sect rise" id="sec-paynow" style={{ '--d': 2 }}>
-      <div className="tasks-head">
-        <h2 className="sec-title">
-          לשלם עכשיו <span className="count-chip">{open}</span>
-        </h2>
-      </div>
-      <div className={`task-list ${all || query ? 'is-all' : ''}`} ref={listRef}>
-        {list.map((o) => {
-          const done = o.status === 'שולם'
-          const urgent = !done && o.dayKey !== 'unknown' && Number(o.dayKey) <= today
-          return (
-            <div key={o.source + o.id} data-flip={o.source + o.id} className="task-slot">
-              <div className={`task task--${MOOD_TONE[o.mood] || 'blue'} ${done ? 'is-done' : ''}`}>
-                <button className="check" onClick={() => onToggle(o)} aria-pressed={done} aria-label={done ? 'סימון כלא שולם' : `סימון כשולם: ${o.name}`}>
-                  <Icon name="check" />
-                </button>
-                <div className="task-main">
-                  <p className="task-text">
-                    <Highlight text={o.name} q={query} /> · <b className="task-amt">{ils(o.amount)}</b>
-                  </p>
-                  <p className="task-due">
-                    {done ? 'שולם' : o.status === 'שולם חלקית' ? 'שולם חלקית · חיוב' : 'חיוב'}
-                    {!done && <b className={urgent ? 'is-urgent' : ''}>{o.dayKey === 'unknown' ? 'תאריך לא ידוע' : `${o.dayKey} לחודש`}</b>}
-                  </p>
-                </div>
-                {!done && (
-                  <button type="button" className="task-mood" onClick={() => onMood(o)} title="כמה הספק לחוץ · לחיצה משנה" aria-label="שינוי רמת לחץ">
-                    {{ happy: '😊', neutral: '😐', angry: '😠' }[o.mood] || '😊'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-        {list.length === 0 && <p className="empty">{query ? `אין תשלום שמתאים ל״${query}״` : 'אין תשלומים החודש'}</p>}
-      </div>
-      {(overflow || all) && !query && <div className={`task-fade ${all ? 'is-hidden' : ''}`} aria-hidden="true" />}
-      {(overflow || all) && !query && (
-        <button className="tasks-more link" onClick={() => setAll((a) => !a)}>
-          {all ? 'הצג פחות' : `הצג את כל ${list.length} התשלומים`}
-          <Icon name="chevronDown" className={`chev ${all ? 'is-up' : ''}`} />
-        </button>
-      )}
-    </section>
-  )
-}
-
-/* ============================================================== */
-/* Payroll rings (template's Team activities)                       */
-const RR = 19.5
-const RC = 2 * Math.PI * RR
-const PAY_PCT = { 'שולם': 100, 'שולם חלקית': 50, 'לא שולם': 0 }
-function Member({ r, i }) {
-  const delay = useEnter(4, 150 + i * 90)
-  const target = PAY_PCT[r.status] ?? 0
-  return (
-    <div className="member" tabIndex={0} aria-label={`${r.emp.name}, ${ils(r.total)}, ${r.status}`}>
-      <div className="mring" style={{ '--c': r.status === 'שולם' ? 'var(--green)' : r.status === 'שולם חלקית' ? 'var(--orange)' : 'var(--teal)' }}>
-        <svg viewBox="0 0 44 44" aria-hidden="true">
-          <circle className="trk" cx="22" cy="22" r={RR} />
-          <circle className="val" cx="22" cy="22" r={RR} strokeDasharray={RC} strokeDashoffset={RC * (1 - Math.max(target, 4) / 100)} style={{ '--C': RC, animationDelay: `${delay}ms` }} />
-        </svg>
-        <Avatar name={r.emp.name} className="ring-avatar" />
-      </div>
-      <span className="member-pct">{ilsK(r.total)}</span>
-      <div className="member-tip" role="tooltip">
-        <strong>{r.emp.name}</strong>
-        <span>{r.emp.role || ''}</span>
-        <em>
-          {ils(r.total)} · {r.status}
-        </em>
-      </div>
-    </div>
-  )
-}
-function Payroll({ rows, total, onOpen }) {
-  const shown = rows.slice(0, 4)
-  return (
-    <section className="team sect rise" id="sec-team" style={{ '--d': 4 }}>
-      <div className="sec-head">
-        <h2 className="sec-title">שכר החודש</h2>
-        <button className="link sec-link" onClick={onOpen}>
-          {ils(total)}
-        </button>
-      </div>
-      <div className="card team-card">
-        {shown.map((r, i) => (
-          <Member key={r.emp.id} r={r} i={i} />
-        ))}
-        {rows.length === 0 && <p className="empty ice-span">עוד לא הוגדרו עובדים</p>}
       </div>
     </section>
   )

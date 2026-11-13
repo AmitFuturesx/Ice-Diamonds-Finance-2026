@@ -60,6 +60,7 @@ export interface Delivery {
   route_to: string;
   price: number;
   notes: string;
+  status?: PaymentStatus; // needs the deliveries.status column (supabase/migrations/2026-11-13_deliveries_status.sql)
 }
 
 // ---------- Employees / payroll ----------

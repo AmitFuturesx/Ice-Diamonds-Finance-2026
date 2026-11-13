@@ -121,6 +121,15 @@ const saveToStorage = <T>(key: string, data: T[]) => {
 };
 
 // Generic Client SDK wrap
+export interface MonthTotals {
+  income: number;
+  fixed: number;
+  variable: number;
+  debts: number;
+  deliveries: number; // net price sum (before VAT)
+  staff: EmployeeMonth[]; // that month's payroll rows
+}
+
 export const dbService = {
   // Authentication
   async login(emailValue: string, passwordValue: string): Promise<{ success: boolean; error?: string; user?: any }> {
@@ -205,34 +214,46 @@ export const dbService = {
 
   /**
    * Per-month totals for a set of months (charts, sparklines, month-over-month deltas).
-   * One query per table; payroll is not included (matches the rest of the app's totals).
+   * One read-only query per table. Deliveries come as the net price sum; payroll comes as the
+   * month's employee_months rows (`staff`) so the caller can price them with computePay.
    */
-  async getMonthTotals(monthIds: string[]): Promise<Record<string, { income: number; fixed: number; variable: number; debts: number }>> {
-    const out: Record<string, { income: number; fixed: number; variable: number; debts: number }> = {};
-    monthIds.forEach((id) => (out[id] = { income: 0, fixed: 0, variable: 0, debts: 0 }));
+  async getMonthTotals(monthIds: string[]): Promise<Record<string, MonthTotals>> {
+    const out: Record<string, MonthTotals> = {};
+    monthIds.forEach((id) => (out[id] = { income: 0, fixed: 0, variable: 0, debts: 0, deliveries: 0, staff: [] }));
     if (!monthIds.length) return out;
-    const add = (rows: any[], key: 'income' | 'fixed' | 'variable' | 'debts', field: string) =>
+    const add = (rows: any[], key: 'income' | 'fixed' | 'variable' | 'debts' | 'deliveries', field: string) =>
       rows.forEach((r) => {
         if (out[r.month_id]) out[r.month_id][key] += Number(r[field]) || 0;
       });
+    const addStaff = (rows: any[]) =>
+      rows.forEach((r) => {
+        if (out[r.month_id]) out[r.month_id].staff.push(r);
+      });
     if (isLiveSupabase && supabaseClient) {
       const q = (table: string, cols: string) => supabaseClient!.from(table).select(cols).in('month_id', monthIds);
-      const [inc, fx, vr, db] = await Promise.all([
+      const [inc, fx, vr, db, dl, st] = await Promise.all([
         q('income_entries', 'month_id,amount'),
         q('fixed_expenses', 'month_id,amount'),
         q('variable_expenses', 'month_id,amount'),
-        q('debts', 'month_id,monthly_payment')
+        q('debts', 'month_id,monthly_payment'),
+        q('deliveries', 'month_id,price'),
+        q('employee_months', '*')
       ]);
       for (const r of [inc, fx, vr, db]) if (r.error) throw r.error;
       add((inc.data as any[]) || [], 'income', 'amount');
       add((fx.data as any[]) || [], 'fixed', 'amount');
       add((vr.data as any[]) || [], 'variable', 'amount');
       add((db.data as any[]) || [], 'debts', 'monthly_payment');
+      // optional extras: a failure here only leaves them out of the history
+      if (!dl.error) add((dl.data as any[]) || [], 'deliveries', 'price');
+      if (!st.error) addStaff((st.data as any[]) || []);
     } else {
       add(getFromStorage<any>('income'), 'income', 'amount');
       add(getFromStorage<any>('fixed_expenses'), 'fixed', 'amount');
       add(getFromStorage<any>('variable_expenses'), 'variable', 'amount');
       add(getFromStorage<any>('debts'), 'debts', 'monthly_payment');
+      add(getFromStorage<any>('deliveries'), 'deliveries', 'price');
+      addStaff(getFromStorage<any>('employee_months'));
     }
     return out;
   },

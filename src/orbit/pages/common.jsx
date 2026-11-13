@@ -6,7 +6,7 @@ import { Select } from '../kit'
 import { dbService } from '../../lib/supabase'
 
 /** Centered dialog; children is a render function that receives close(). */
-export function Modal({ label, onClose, children }) {
+export function Modal({ label, onClose, children, className = '' }) {
   const [leaving, setLeaving] = useState(false)
   const close = useCallback(() => {
     setLeaving(true)
@@ -25,7 +25,7 @@ export function Modal({ label, onClose, children }) {
         if (e.target === e.currentTarget) close()
       }}
     >
-      <div className="modal-card" role="dialog" aria-modal="true" aria-label={label}>
+      <div className={`modal-card ${className}`} role="dialog" aria-modal="true" aria-label={label}>
         {children(close)}
       </div>
     </div>,

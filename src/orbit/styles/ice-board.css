@@ -1,0 +1,729 @@
+/* ==================================================================
+   Practical board (Nov 2026): category blocks → balance → payment days
+   → charts, plus the list popup. Same visual language as Orbit.
+   ================================================================== */
+.ice-dash {
+  gap: 2.4rem;
+}
+.ice-row-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  margin-bottom: 1.05rem;
+}
+.ice-slot {
+  min-width: 0;
+  display: flex;
+}
+.ice-slot > * {
+  flex: 1;
+  min-width: 0;
+}
+.ice-bar {
+  height: 0.45rem;
+  border-radius: 99px;
+  background: var(--row-grey);
+  overflow: hidden;
+}
+.ice-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+  transition: width 0.9s var(--out);
+}
+
+/* ---------- 1. category blocks ---------- */
+.ice-cats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+.ice-cat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.1rem 1rem 1.15rem;
+}
+.ice-cat-head .ice-cat-ic {
+  width: 2.15rem;
+  height: 2.15rem;
+}
+.ice-cat-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: -0.3rem;
+  padding: 0.3rem;
+  border-radius: 1rem;
+  text-align: start;
+  transition: background-color 0.2s;
+}
+.ice-cat-head:hover {
+  background: var(--row-grey);
+}
+.ice-cat-head:hover .ice-cat-go {
+  color: var(--ink);
+  translate: -3px 0;
+}
+.ice-cat-ic {
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--tone) 14%, #fff);
+  color: var(--tone);
+}
+.ice-cat-ic .icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.ice-cat-head h3 {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-cat-go {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: none;
+  color: var(--muted-2);
+  transition:
+    color 0.2s,
+    translate 0.3s var(--spring);
+}
+.ice-cat-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    'total total'
+    'bar bar'
+    'left paid';
+  gap: 0.6rem 0.45rem;
+}
+.ice-cat-body .ice-bar {
+  grid-area: bar;
+  margin: 0 0.15rem;
+}
+.ice-tile {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+  padding: 0.65rem 0.6rem;
+  border-radius: 0.95rem;
+  text-align: start;
+  transition:
+    background-color 0.2s,
+    translate 0.3s var(--spring),
+    box-shadow 0.2s;
+}
+.ice-tile:hover {
+  translate: 0 -2px;
+}
+.ice-tile:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.ice-tile span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ice-tile b {
+  max-width: 100%;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-tile small {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ice-tile .dot {
+  width: 0.55rem;
+  height: 0.55rem;
+}
+.ice-tile--total {
+  grid-area: total;
+  padding: 0.55rem 0.6rem 0.5rem;
+  margin: -0.2rem -0.25rem 0;
+}
+.ice-tile--total:hover {
+  background: var(--row-grey);
+}
+.ice-tile--total b {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.ice-tile--left {
+  grid-area: left;
+  background: #fdf1e2;
+}
+.ice-tile--left .dot {
+  background: #e0892a;
+}
+.ice-tile--left.is-zero {
+  background: var(--row-grey);
+}
+.ice-tile--paid {
+  grid-area: paid;
+  background: var(--row-green);
+}
+.ice-tile--paid .dot {
+  background: var(--green-2);
+}
+.ice-tile--left:hover,
+.ice-tile--paid:hover {
+  box-shadow: inset 0 0 0 1.5px rgb(35 47 56 / 0.08);
+}
+
+/* ---------- 2. balance ---------- */
+.ice-bal {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.25fr);
+  gap: 0.35rem;
+  padding: 0.55rem;
+}
+.ice-bal-cell,
+.ice-bal-profit {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  padding: 1.05rem 1.15rem;
+  border-radius: 1.3rem;
+  text-align: start;
+}
+.ice-bal-cell {
+  transition: background-color 0.2s;
+}
+.ice-bal-cell:hover {
+  background: var(--panel);
+}
+.ice-bal-cell + .ice-bal-cell::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -0.2rem;
+  top: 22%;
+  bottom: 22%;
+  width: 1px;
+  background: var(--line);
+}
+.ice-bal-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ice-bal-ic {
+  width: 1.95rem;
+  height: 1.95rem;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--tone, var(--green)) 14%, #fff);
+  color: var(--tone, var(--green));
+}
+.ice-bal-ic .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.ice-bal-cell b,
+.ice-bal-profit b {
+  max-width: 100%;
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-bal-cell small,
+.ice-bal-profit small {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-bal-profit {
+  color: #fff;
+  background: linear-gradient(162deg, #82ce71 0%, #67b962 38%, #4ea463 72%, #3a8a73 118%);
+  box-shadow: 0 14px 30px -18px rgb(40 110 80 / 0.8);
+}
+.ice-bal-profit.is-neg {
+  background: linear-gradient(162deg, #f08b74 0%, #e4685c 50%, #c9504f 110%);
+  box-shadow: 0 14px 30px -18px rgb(170 60 60 / 0.8);
+}
+.ice-bal-profit .ice-bal-top,
+.ice-bal-profit small {
+  color: rgb(255 255 255 / 0.9);
+}
+.ice-bal-profit b {
+  font-size: 1.9rem;
+  color: #fff;
+}
+.ice-bal-profit .ice-bal-ic {
+  background: rgb(255 255 255 / 0.22);
+  color: #fff;
+}
+
+/* ---------- 3. payment days ---------- */
+.ice-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.1rem;
+}
+.ice-day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 1.15rem 1.2rem 1.1rem;
+  text-align: start;
+  transition:
+    translate 0.35s var(--spring),
+    box-shadow 0.3s;
+}
+.ice-day:hover {
+  translate: 0 -3px;
+  box-shadow: var(--sh-pop);
+}
+.ice-day:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+.ice-day-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.15rem;
+}
+.ice-day-date {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.ice-day-date b {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--teal);
+}
+.ice-day-date small {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-day-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-day-amt {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ice-day-foot {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-day-moods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-height: 1.75rem;
+  margin-top: 0.15rem;
+}
+.ice-day-none {
+  font-size: 0.82rem;
+  color: var(--muted);
+  align-self: center;
+}
+
+/* ---------- 4. charts row ---------- */
+.ice-charts {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+.ice-charts > .flow {
+  display: flex;
+  flex-direction: column;
+}
+.ice-charts > .flow .flow-card {
+  flex: 1;
+}
+
+/* ---------- popup ---------- */
+.modal-card.ice-pop {
+  width: min(44rem, 100%);
+  max-height: calc(100vh - 3rem);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ice-pop-in {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  min-height: 0;
+  padding: 1.5rem 1.5rem 1.3rem;
+}
+.ice-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.ice-pop-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.ice-pop-head h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ice-pop-head p {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.ice-pop-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.ice-pop-tab {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 1rem;
+  background: var(--row-grey);
+  text-align: start;
+  box-shadow: inset 0 0 0 2px transparent;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
+}
+.ice-pop-tab span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ice-pop-tab b {
+  max-width: 100%;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-pop-tab small {
+  font-size: 0.76rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ice-pop-tab.is-on {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--teal);
+}
+.ice-pop-tab--left.is-on {
+  background: #fdf1e2;
+  box-shadow: inset 0 0 0 2px #e0892a;
+}
+.ice-pop-tab--paid.is-on {
+  background: var(--row-green);
+  box-shadow: inset 0 0 0 2px var(--green-2);
+}
+.ice-pop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  max-height: min(52vh, 30rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 0.25rem;
+  margin-inline-end: -0.25rem;
+}
+.ice-pop-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem 0.8rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 1.05rem;
+  background: var(--row-grey);
+  transition:
+    opacity 0.3s,
+    background-color 0.3s;
+}
+.ice-pop-row.is-happy {
+  background: var(--row-green);
+}
+.ice-pop-row.is-neutral {
+  background: #fdf3e4;
+}
+.ice-pop-row.is-angry {
+  background: #fdeae8;
+}
+.ice-pop-row.is-paid {
+  opacity: 0.62;
+}
+.ice-pop-row.is-paid .ice-pop-main b {
+  text-decoration: line-through;
+  text-decoration-color: var(--muted);
+}
+.ice-check {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px var(--muted-2);
+  color: transparent;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    scale 0.25s var(--spring);
+}
+.ice-check .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.ice-check:hover {
+  color: var(--muted-2);
+}
+.ice-check:active {
+  scale: 0.9;
+}
+.ice-check.is-on {
+  background: var(--green-2);
+  box-shadow: none;
+  color: #fff;
+}
+.ice-pop-main {
+  min-width: 0;
+}
+.ice-pop-main b {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-pop-main span {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-pop-amt {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ice-pop-pills {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.ice-pop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border-radius: 1.05rem;
+  background: var(--row-grey);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-pop-empty .icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--green-2);
+}
+.ice-pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem 1.2rem;
+  flex-wrap: wrap;
+}
+.ice-pop-foot p {
+  flex: 1 1 16rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1360px) {
+  .ice-tile--total b {
+    font-size: 1.4rem;
+  }
+  .ice-bal-cell b {
+    font-size: 1.35rem;
+  }
+  .ice-bal-profit b {
+    font-size: 1.6rem;
+  }
+}
+@media (max-width: 1180px) {
+  .ice-cats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ice-bal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .ice-bal-cell {
+    background: var(--panel);
+  }
+  .ice-bal-cell + .ice-bal-cell::before {
+    display: none;
+  }
+  .ice-bal-profit {
+    grid-column: 1 / -1;
+  }
+  .ice-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ice-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 767px) {
+  .ice-dash {
+    gap: 1.9rem;
+  }
+  .ice-cats {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.8rem;
+  }
+  .ice-cat {
+    padding: 1rem;
+    gap: 0.7rem;
+  }
+  .ice-cat-body {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      'total left paid'
+      'bar bar bar';
+    gap: 0.45rem;
+  }
+  .ice-tile {
+    padding: 0.6rem 0.65rem;
+  }
+  .ice-tile--total {
+    margin: 0;
+    background: var(--row-grey);
+  }
+  .ice-tile--total b,
+  .ice-tile b {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .ice-bal-cell,
+  .ice-bal-profit {
+    padding: 0.9rem 0.95rem;
+  }
+  .ice-bal-cell b {
+    font-size: 1.2rem;
+  }
+  .ice-bal-top {
+    font-size: 0.8rem;
+  }
+  .ice-bal-ic {
+    display: none;
+  }
+  .ice-bal-profit .ice-bal-ic {
+    display: grid;
+  }
+  .ice-days {
+    gap: 0.7rem;
+  }
+  .ice-day {
+    padding: 0.95rem 1rem;
+  }
+  .ice-day-date b {
+    font-size: 1.4rem;
+  }
+  .ice-day-amt {
+    font-size: 1.25rem;
+  }
+  .ice-day-top .pill {
+    display: none;
+  }
+  /* popup becomes a bottom sheet */
+  .modal:has(.ice-pop) {
+    padding: 0;
+    place-items: end stretch;
+  }
+  .modal-card.ice-pop {
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 1.6rem 1.6rem 0 0;
+  }
+  .ice-pop-in {
+    padding: 1.2rem 1rem 1.3rem;
+  }
+  .ice-pop-tab {
+    padding: 0.6rem 0.65rem;
+  }
+  .ice-pop-tab b {
+    font-size: 1rem;
+  }
+  .ice-pop-list {
+    max-height: 56vh;
+  }
+  .ice-pop-row {
+    padding: 0.75rem 0.8rem;
+  }
+}
