@@ -135,6 +135,71 @@ export default function IncomeCalendar(props) {
 }
 
 /* ============================================================== */
+/* Compact strip for the dashboard: today, this week, the month.   */
+export function IncomeToday(props) {
+  const { incomeEntries = [], dailyOrders = [], monthYear, monthNumber, onNavigate, d = 0 } = props
+  const cal = useMemo(() => buildMonth({ incomeEntries, dailyOrders, year: monthYear, month: monthNumber }), [incomeEntries, dailyOrders, monthYear, monthNumber])
+  const [open, setOpen] = useState(null)
+  // the open month is the current one → today; otherwise the month's last day
+  const focus = cal.days.find((x) => x.today) || cal.days[(cal.lastDay || cal.daysInMonth) - 1]
+  const week = cal.weeks.find((w) => w.cells.some((c) => c && c.d === focus?.d)) || cal.weeks[0]
+  const weekDays = week.cells
+  const weekMax = Math.max(1, ...weekDays.map((c) => (c ? c.total : 0)))
+  const isToday = !!focus?.today
+  if (!focus) return null
+
+  return (
+    <section className="card ice-today card-in" style={{ '--d': d }}>
+      <div className="ice-today-cell is-day">
+        <span className="ice-today-label">{isToday ? 'נכנס היום' : `נכנס ב־${focus.d}/${cal.m}`}</span>
+        <b>{ils(focus.total)}</b>
+        <small>{focus.orders ? pl(focus.orders, 'הזמנה', 'הזמנות') : focus.filled ? 'בלי הזמנות' : 'עוד לא מולא'}</small>
+        <button type="button" className="btn btn--primary btn--sm" onClick={() => setOpen(focus.d)}>
+          <Icon name={focus.filled ? 'edit' : 'plus'} /> {focus.filled ? 'עדכון' : isToday ? 'הזנת היום' : 'הזנה'}
+        </button>
+      </div>
+
+      <div className="ice-today-cell is-week">
+        <span className="ice-today-label">
+          נכנס השבוע{week.from ? ` · ${week.from}–${week.to}/${cal.m}` : ''}
+        </span>
+        <b>{ils(week.total)}</b>
+        <small>{pl(week.orders, 'הזמנה', 'הזמנות')}</small>
+        <div className="ice-today-bars" aria-hidden="true">
+          {weekDays.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              tabIndex={-1}
+              className={`ice-today-bar ${c?.today ? 'is-today' : ''} ${c && c.past && !c.filled ? 'is-missing' : ''}`}
+              disabled={!c || c.future}
+              onClick={() => c && setOpen(c.d)}
+              title={c ? `${WEEKDAY[i]} ${c.d}/${cal.m} · ${ils(c.total)}` : ''}
+            >
+              <i style={{ height: `${c ? 0.35 + (c.total / weekMax) * 3 : 0}rem` }} />
+              <em>{WEEKDAY[i]}</em>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="ice-today-cell is-month">
+        <span className="ice-today-label">החודש עד עכשיו</span>
+        <b>{ils(cal.totals.total + cal.undated)}</b>
+        <small>
+          {cal.filled.length}/{cal.lastDay || cal.daysInMonth} ימים מולאו{cal.missing.length ? ` · חסרים ${cal.missing.length}` : ''}
+        </small>
+        <button type="button" className="link ice-today-link" onClick={() => onNavigate?.('income')}>
+          ללוח ההכנסות החודשי <Icon name="arrowRight" className="ob-arrow" />
+        </button>
+      </div>
+
+      {open && <DayModal key={open} {...props} cal={cal} day={open} setDay={setOpen} onClose={() => setOpen(null)} />}
+    </section>
+  )
+}
+
+/* ============================================================== */
 /* Quick entry for one day                                         */
 export function DayModal({ cal, day, setDay, onClose, incomeEntries, dailyOrders, activeMonthId, onSaveIncome, onDeleteIncome, onSaveDailyOrders, notify }) {
   const info = cal.days[day - 1]

@@ -14,7 +14,7 @@ import { computePay, VAT_RATE } from '../lib/payroll'
 import { dbService } from '../lib/supabase'
 import { Modal, MonthBar } from './pages/common'
 import { CAT, CATS, DAYS, DAY_LABEL, DAY_ORDER, UNPAID, buildPayments } from './payments'
-import IncomeCalendar from './IncomeCalendar'
+import { IncomeToday } from './IncomeCalendar'
 
 const SHORT_MONTH = ['', 'ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳']
 const SOURCES = [
@@ -210,22 +210,6 @@ export default function Dashboard(props) {
         </button>
       </PageHead>
 
-      {/* ---------- 0. daily income calendar ---------- */}
-      <IncomeCalendar
-        incomeEntries={incomeEntries}
-        dailyOrders={dailyOrders}
-        monthYear={activeMonth?.year}
-        monthNumber={activeMonth?.month_number}
-        months={months}
-        activeMonthId={activeMonthId}
-        onChangeMonth={onChangeMonth}
-        onSaveIncome={onSaveIncome}
-        onDeleteIncome={onDeleteIncome}
-        onSaveDailyOrders={onSaveDailyOrders}
-        notify={notify}
-        d={0}
-      />
-
       {/* ---------- 1. balance ---------- */}
       <section className="ice-row">
         <div className="ice-row-head">
@@ -324,6 +308,27 @@ export default function Dashboard(props) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ---------- 3b. income today / this week (compact) ---------- */}
+      <section className="ice-row">
+        <div className="ice-row-head">
+          <h2 className="sec-title">הכנסות</h2>
+          <p className="sec-sub">כמה נכנס היום והשבוע · הלוח החודשי המלא בעמוד ההכנסות</p>
+        </div>
+        <IncomeToday
+          incomeEntries={incomeEntries}
+          dailyOrders={dailyOrders}
+          monthYear={activeMonth?.year}
+          monthNumber={activeMonth?.month_number}
+          activeMonthId={activeMonthId}
+          onSaveIncome={onSaveIncome}
+          onDeleteIncome={onDeleteIncome}
+          onSaveDailyOrders={onSaveDailyOrders}
+          onNavigate={onNavigate}
+          notify={notify}
+          d={10}
+        />
       </section>
 
       {/* ---------- 4. charts ---------- */}
