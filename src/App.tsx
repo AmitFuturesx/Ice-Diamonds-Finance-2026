@@ -890,6 +890,10 @@ export default function App() {
               <>
                 {activePage === 'dashboard' && (
                   <OrbitDashboard
+                    dailyOrders={dailyOrders}
+                    onSaveIncome={handleSaveIncomeEntry}
+                    onDeleteIncome={handleDeleteIncomeEntry}
+                    onSaveDailyOrders={handleSaveDailyOrders}
                     fixedExpenses={fixedExpenses}
                     variableExpenses={variableExpenses}
                     debts={debts}

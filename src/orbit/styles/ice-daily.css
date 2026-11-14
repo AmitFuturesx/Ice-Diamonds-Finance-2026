@@ -180,6 +180,264 @@
   font-size: 1rem;
 }
 
+/* ---------- calendar ---------- */
+.ice-show-sm {
+  display: none;
+}
+.ice-cal-grid i,
+.ice-cal-add i {
+  font-style: normal;
+}
+.ice-cal {
+  padding: 1.4rem 1.5rem 1.2rem;
+}
+.ice-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  padding-bottom: 1.1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.ice-cal-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem 1.4rem;
+  flex-wrap: wrap;
+}
+.ice-cal-title h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ice-cal-month {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border-radius: 1rem;
+  background: var(--panel);
+}
+.ice-cal-month b {
+  min-width: 7.5rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ice-cal-month .icon-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+.ice-cal-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 2rem;
+}
+.ice-cal-stats div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ice-cal-stats span {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-cal-stats b {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ice-cal-stats b small {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.ice-cal-stats .is-main b {
+  color: var(--green-3);
+  font-size: 1.45rem;
+}
+
+.ice-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 1.05fr);
+  gap: 0.5rem;
+}
+.ice-cal-row {
+  display: contents;
+}
+.ice-cal-wd {
+  padding-bottom: 0.2rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ice-cal-day {
+  position: relative;
+  min-height: 5.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 1.5rem 0.4rem 0.6rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s,
+    translate 0.3s var(--spring);
+}
+button.ice-cal-day:not(:disabled):hover {
+  translate: 0 -2px;
+  box-shadow:
+    inset 0 0 0 1.5px var(--teal-2),
+    var(--sh-card);
+}
+.ice-cal-day.is-blank {
+  background: none;
+  box-shadow: none;
+}
+.ice-cal-day.is-future {
+  opacity: 0.5;
+  cursor: default;
+}
+.ice-cal-num {
+  position: absolute;
+  top: 0.45rem;
+  inset-inline-start: 0.65rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ice-cal-day.is-filled {
+  background: linear-gradient(162deg, #edf7ea 0%, #dff0da 100%);
+  box-shadow: inset 0 0 0 1px #bfe0b6;
+}
+.ice-cal-amt {
+  max-width: 100%;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--green-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ice-cal-ord {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.ice-cal-day.is-today {
+  box-shadow:
+    inset 0 0 0 2px var(--teal),
+    0 6px 16px -10px rgb(44 109 133 / 0.6);
+}
+.ice-cal-day.is-today .ice-cal-num {
+  padding: 0.05rem 0.45rem;
+  border-radius: 99px;
+  background: var(--teal);
+  color: #fff;
+  top: 0.35rem;
+}
+.ice-cal-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--teal);
+}
+.ice-cal-add .icon {
+  width: 1rem;
+  height: 1rem;
+}
+.ice-cal-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #f0a43c;
+}
+.ice-cal-day .ice-cal-dot {
+  position: absolute;
+  bottom: 0.55rem;
+  inset-inline-end: 0.6rem;
+}
+.ice-cal-wsum-h {
+  color: var(--ink-2);
+}
+.ice-cal-wsum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 5.4rem;
+  border-radius: 1rem;
+  background: var(--row-grey);
+  text-align: center;
+}
+.ice-cal-wsum b {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ice-cal-wsum.has {
+  background: var(--row-green);
+}
+.ice-cal-wsum.has b {
+  color: var(--green-3);
+}
+.ice-cal-wsum small {
+  font-size: 0.76rem;
+  color: var(--ink-2);
+}
+.ice-cal-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---------- day popup ---------- */
+.modal-card.ice-daypop {
+  width: min(36rem, 100%);
+}
+.ice-daypop-head {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.ice-daypop-head > div {
+  flex: 1;
+  text-align: center;
+}
+.ice-daypop-head h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ice-daypop-head p {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.ice-daypop-actions {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0.6rem;
+}
+
 /* ---------- daily report ---------- */
 .ice-rep {
   display: flex;
@@ -287,7 +545,78 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+@media (max-width: 1100px) {
+  .ice-cal-day,
+  .ice-cal-wsum {
+    min-height: 4.6rem;
+  }
+  .ice-cal-amt {
+    font-size: 0.92rem;
+  }
+}
 @media (max-width: 767px) {
+  .ice-show-sm {
+    display: inline;
+  }
+  .ice-cal {
+    padding: 1rem 0.8rem 0.9rem;
+  }
+  .ice-cal-head {
+    gap: 0.8rem;
+  }
+  .ice-cal-title {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .ice-cal-stats {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+  .ice-cal-stats b {
+    font-size: 1rem;
+  }
+  .ice-cal-stats .is-main b {
+    font-size: 1.05rem;
+  }
+  .ice-cal-stats span {
+    font-size: 0.72rem;
+  }
+  .ice-cal-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.3rem;
+  }
+  .ice-cal-wsum,
+  .ice-cal-wsum-h {
+    display: none;
+  }
+  .ice-cal-day {
+    min-height: 3.6rem;
+    padding: 1.15rem 0.1rem 0.35rem;
+    border-radius: 0.7rem;
+  }
+  .ice-cal-num {
+    top: 0.3rem;
+    inset-inline-start: 0.4rem;
+    font-size: 0.75rem;
+  }
+  .ice-cal-day.is-today .ice-cal-num {
+    padding: 0 0.3rem;
+    top: 0.25rem;
+  }
+  .ice-cal-amt {
+    font-size: 0.78rem;
+  }
+  .ice-cal-ord {
+    display: none;
+  }
+  .ice-cal-day .ice-cal-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    bottom: 0.4rem;
+    inset-inline-end: 0.4rem;
+  }
   .ice-view-switch {
     margin-top: 0;
   }

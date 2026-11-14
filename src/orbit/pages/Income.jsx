@@ -90,6 +90,8 @@ export default function Income(props) {
           monthYear={monthYear}
           monthNumber={monthNumber}
           activeMonthId={activeMonthId}
+          months={months}
+          onChangeMonth={onChangeMonth}
           onSaveIncome={onSaveIncome}
           onDeleteIncome={onDeleteIncome}
           onSaveDailyOrders={onSaveDailyOrders}
