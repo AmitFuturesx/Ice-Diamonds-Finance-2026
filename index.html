@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ice Diamonds - ניהול פיננסי לעסקי תכשיטים</title>
+    <script>
+      // dark mode before the first paint, so the page never flashes white
+      try {
+        if (localStorage.getItem('ice-theme') === 'dark') document.documentElement.dataset.theme = 'dark'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

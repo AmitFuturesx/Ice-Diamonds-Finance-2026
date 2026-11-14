@@ -10,3 +10,5 @@
 @import './ice-board.css';
 @import './ice-invoices.css';
 @import './ice-daily.css';
+@import './ice-dark.gen.css';
+@import './ice-dark.css';

@@ -107,6 +107,23 @@ export default function App() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeMonths, setEmployeeMonths] = useState<EmployeeMonth[]>([]);
   const [dailyOrders, setDailyOrders] = useState<DailyOrders[]>([]);
+  // Light / dark — remembered on this device; index.html applies it before the first paint
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try {
+      return localStorage.getItem('ice-theme') === 'dark' ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem('ice-theme', theme);
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  }, [theme]);
+  const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
   const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Authentication check on startup
@@ -839,6 +856,10 @@ export default function App() {
               <span className="nav-label">חיפוש מהיר</span>
               <span className="nav-badge" dir="ltr">Ctrl K</span>
             </button>
+            <button className="nav-item ice-theme-btn" data-tip={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'} onClick={toggleTheme} aria-pressed={theme === 'dark'}>
+              <OIcon name={theme === 'dark' ? 'sun' : 'moon'} />
+              <span className="nav-label">{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span>
+            </button>
             <button className="nav-item" data-tip="יציאה" onClick={handleLogout} id="desktop-logout-btn">
               <OIcon name="logout" />
               <span className="nav-label">יציאה</span>
@@ -1051,6 +1072,14 @@ export default function App() {
                 </div>
                 <span className="text-xs text-white/70 truncate">{currentUser?.email}</span>
               </div>
+              <button
+                onClick={toggleTheme}
+                aria-pressed={theme === 'dark'}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-white/85 hover:text-white bg-white/10 hover:bg-white/15 rounded-xl transition-all cursor-pointer font-medium"
+              >
+                <OIcon name={theme === 'dark' ? 'sun' : 'moon'} />
+                <span>{theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}</span>
+              </button>
               <button
                 id="drawer-logout"
                 onClick={handleLogout}

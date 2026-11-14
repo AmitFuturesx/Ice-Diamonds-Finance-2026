@@ -1,0 +1,164 @@
+/* ==================================================================
+   Dark mode (html[data-theme='dark']) — the toggle sits at the bottom of the menu.
+   Only the white/grey surfaces and text turn dark; the green frame, green buttons
+   and green cards stay exactly as they are.
+   Rule copies of every light surface are generated into ice-dark.gen.css
+   (node scripts/gen-dark.mjs); this file holds the tokens and hand-tuned spots.
+   ================================================================== */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e1417;
+  --panel: #121a1e;
+  --card: #1a2328;
+  --ink: #e9eff2;
+  --ink-2: #c5d0d6;
+  --muted: #8d9aa2;
+  --muted-2: #5b6870;
+  --line: #27333b;
+
+  --teal: #3b8eab;
+  --teal-2: #4a9fbd;
+  --teal-soft: #16303a;
+  --green-soft: #1c2e20;
+  --t-blue: #16303a;
+  --t-green: #1c2e20;
+  --t-peach: #33281a;
+  --row-green: #1b2b1f;
+  --row-grey: #1f292f;
+
+  --page-bg: #0e1417;
+  --sh-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 14px 34px -16px rgb(0 0 0 / 0.6);
+  --sh-pop: 0 4px 10px rgb(0 0 0 / 0.35), 0 24px 48px -14px rgb(0 0 0 / 0.7);
+  --sh-lift: 0 12px 22px -8px rgb(0 0 0 / 0.45), 0 34px 60px -20px rgb(0 0 0 / 0.75);
+
+  /* Tailwind tokens used by the older pieces (mobile menu, dialogs, palette) */
+  --color-ink: #e9eff2;
+  --color-ink-2: #c5d0d6;
+  --color-muted: #8d9aa2;
+  --color-line: #27333b;
+  --color-panel: #1d272c;
+}
+
+html[data-theme='dark'] body {
+  background: var(--bg);
+  color: var(--ink);
+}
+html[data-theme='dark'] .panel {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.04),
+    0 10px 30px -18px rgb(0 0 0 / 0.6);
+}
+
+/* the white pill behind the active menu item becomes a dark one; green stays around it */
+html[data-theme='dark'] .nav-pill {
+  background: var(--card);
+  box-shadow: 0 10px 22px -10px rgb(0 0 0 / 0.55);
+}
+
+/* form controls */
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select {
+  color: var(--ink);
+}
+html[data-theme='dark'] input::placeholder,
+html[data-theme='dark'] textarea::placeholder {
+  color: var(--muted-2);
+}
+html[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+/* translucent white chips that sat on light rows */
+html[data-theme='dark'] .ice-pop-amt,
+html[data-theme='dark'] .task-mood {
+  background: rgb(255 255 255 / 0.08);
+}
+html[data-theme='dark'] .ice-cal-day.is-filled {
+  background: linear-gradient(162deg, #1c2e20 0%, #1f3524 100%);
+  box-shadow: inset 0 0 0 1px #2f5034;
+}
+html[data-theme='dark'] .ice-cal-day.is-today {
+  box-shadow:
+    inset 0 0 0 2px var(--teal),
+    0 6px 16px -10px rgb(0 0 0 / 0.6);
+}
+html[data-theme='dark'] .ice-cal-amt,
+html[data-theme='dark'] .ice-cal-wsum.has b,
+html[data-theme='dark'] .ice-today-cell.is-day b,
+html[data-theme='dark'] .ice-cal-stats .is-main b {
+  color: var(--green);
+}
+html[data-theme='dark'] .ice-today-cell.is-day {
+  background: linear-gradient(162deg, #1c2e20 0%, #1f3524 100%);
+}
+html[data-theme='dark'] .ice-rep-missing,
+html[data-theme='dark'] .ice-inv-alert,
+html[data-theme='dark'] .ice-need-badge.is-missing {
+  color: #f0b56a;
+}
+html[data-theme='dark'] .ice-inv-ok,
+html[data-theme='dark'] .ice-need-badge.is-done {
+  color: var(--green);
+}
+html[data-theme='dark'] .ice-day-field {
+  background: color-mix(in srgb, var(--tone) 9%, var(--card));
+}
+html[data-theme='dark'] .ice-split-cell {
+  background: color-mix(in srgb, var(--tone) 8%, var(--card));
+}
+html[data-theme='dark'] .ice-drop {
+  outline-color: rgb(74 159 189 / 0.35);
+}
+
+/* folder cards (debts) paint themselves from --fc */
+html[data-theme='dark'] .file {
+  --fc: var(--card);
+}
+html[data-theme='dark'] .file--cream {
+  --fc: #2a2419;
+}
+
+/* pills keep their colour but on dark tints */
+html[data-theme='dark'] .pill--green {
+  background: #1c2e20;
+  color: var(--green);
+}
+html[data-theme='dark'] .pill--teal {
+  background: #16303a;
+  color: #7cc3dc;
+}
+
+/* older Tailwind-styled pieces (mobile menu, add-month dialog, quick search) */
+html[data-theme='dark'] .bg-white {
+  background-color: var(--card) !important;
+}
+html[data-theme='dark'] .bg-slate-50,
+html[data-theme='dark'] .bg-slate-100 {
+  background-color: #222d33 !important;
+}
+html[data-theme='dark'] .bg-rose-50 {
+  background-color: #3a2224 !important;
+}
+html[data-theme='dark'] .text-slate-900,
+html[data-theme='dark'] .text-slate-800,
+html[data-theme='dark'] .text-slate-700 {
+  color: var(--ink) !important;
+}
+html[data-theme='dark'] .text-slate-600,
+html[data-theme='dark'] .text-slate-500 {
+  color: var(--muted) !important;
+}
+html[data-theme='dark'] .border-line,
+html[data-theme='dark'] .border-slate-100,
+html[data-theme='dark'] .border-slate-200 {
+  border-color: var(--line) !important;
+}
+
+/* the theme switch itself */
+.ice-theme-btn .icon {
+  transition: rotate 0.5s var(--spring);
+}
+html[data-theme='dark'] .ice-theme-btn .icon {
+  rotate: -25deg;
+}
