@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'orbit', 'styles')
-const FILES = ['base.css', 'shell.css', 'board.css', 'widgets.css', 'kit.css', 'pages-crm.css', 'pages-a.css', 'rtl.css', 'ice-board.css', 'ice-invoices.css', 'ice-daily.css']
+const FILES = ['base.css', 'shell.css', 'board.css', 'widgets.css', 'kit.css', 'pages-crm.css', 'pages-a.css', 'rtl.css', 'ice-board.css', 'ice-invoices.css', 'ice-daily.css', 'ice-var.css']
 
 // light → dark (surfaces, borders, shadows)
 const MAP = {

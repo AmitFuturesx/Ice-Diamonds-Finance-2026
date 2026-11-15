@@ -27,6 +27,21 @@ export interface VariableExpense {
   date: string;
   status: PaymentStatus;
   mood?: string; // Vendor patience: 'happy' | 'neutral' | 'angry'
+  // one purchase from a supplier (supabase/migrations/2026-11-15_suppliers.sql)
+  supplier_id?: string | null;
+  description?: string | null;
+  vat_amount?: number | null; // VAT part of amount (amount is the total incl. VAT)
+}
+
+// A permanent supplier of variable expenses: listed every month, purchases are variable_expenses rows
+export interface Supplier {
+  id: string;
+  name: string;
+  kind: 'variable';
+  vat_exempt: boolean;
+  mood: string;
+  active: boolean;
+  created_at?: string;
 }
 
 export interface Debt {

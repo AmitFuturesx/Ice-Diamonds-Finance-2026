@@ -32,7 +32,7 @@ export const fmtDate = (s) => {
 export function buildPayments({ fixedExpenses = [], variableExpenses = [], employees = [], empMonthById = {}, debts = [], deliveries = [] }) {
   return [
     ...fixedExpenses.map((e) => ({ uid: `f${e.id}`, cat: 'fixed', id: e.id, name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN), mood: e.mood || 'happy', raw: e })),
-    ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', id: e.id, name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
+    ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', id: e.id, name: e.name, sub: [e.date ? fmtDate(e.date) : null, e.description].filter(Boolean).join(' · ') || undefined, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
     ...employees
       .filter((e) => e.active !== false)
       .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', id: e.id, name: e.name, sub: e.role, dayKey: bucketKey(e.payment_day ? parseInt(e.payment_day, 10) : NaN), amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),

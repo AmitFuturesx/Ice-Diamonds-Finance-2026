@@ -146,7 +146,7 @@ export default function Invoices(props) {
   /* ---------- this month's payments and their invoice ---------- */
   const empMonthById = useMemo(() => Object.fromEntries(employeeMonths.map((m) => [m.employee_id, m])), [employeeMonths])
   const payments = useMemo(
-    () => buildPayments({ fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries }),
+    () => buildPayments({ fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries }).filter((p) => p.amount > 0),
     [fixedExpenses, variableExpenses, employees, empMonthById, debts, deliveries]
   )
   const view = rows.map((r) => ({ ...r, state: stateOf(r) }))
@@ -340,7 +340,7 @@ export default function Invoices(props) {
                     <b>{p.name}</b>
                     <span className="ice-pop-amt">{ils(p.amount)}</span>
                   </p>
-                  <span className="ice-pop-where">{[c.title, p.dayKey && p.dayKey !== 'unknown' ? DAY_LABEL[p.dayKey] : null, p.sub].filter(Boolean).join(' · ')}</span>
+                  <span className="ice-pop-where">{[c.title, p.cat !== 'variable' && p.dayKey && p.dayKey !== 'unknown' ? DAY_LABEL[p.dayKey] : null, p.sub].filter(Boolean).join(' · ')}</span>
                 </div>
                 <div className="ice-need-state">
                   {p.inv === 'done' && (

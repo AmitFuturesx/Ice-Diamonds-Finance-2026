@@ -10,7 +10,8 @@ import {
   IncomeSource,
   Employee,
   EmployeeMonth,
-  DailyOrders
+  DailyOrders,
+  Supplier
 } from './types';
 import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
@@ -26,6 +27,7 @@ import OIncome from './orbit/pages/Income';
 import ODeliveries from './orbit/pages/Deliveries';
 import OEmployees from './orbit/pages/Employees';
 import OInvoices from './orbit/pages/Invoices';
+import OVariable from './orbit/pages/VariableExpenses';
 import CommandPalette, { PaletteItem } from './components/CommandPalette';
 import { useToasts, ToastViewport } from './components/Toasts';
 
@@ -105,6 +107,7 @@ export default function App() {
   const [incomeEntries, setIncomeEntries] = useState<IncomeEntry[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [employeeMonths, setEmployeeMonths] = useState<EmployeeMonth[]>([]);
   const [dailyOrders, setDailyOrders] = useState<DailyOrders[]>([]);
   // Light / dark — remembered on this device; index.html applies it before the first paint
@@ -202,6 +205,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     dbService.getEmployees().then(setEmployees).catch((err) => console.error('Error loading employees', err));
+    dbService.getSuppliers().then(setSuppliers).catch((err) => console.error('Error loading suppliers', err));
   }, [currentUser]);
 
   useEffect(() => {
@@ -473,8 +477,24 @@ export default function App() {
           return [...prev, saved];
         }
       });
+      return saved;
     } catch (err) {
       console.error(err);
+      const msg = String((err as { message?: string })?.message || '');
+      pushToast(/supplier_id|description|vat_amount/.test(msg) ? 'שמירת הרכישה דורשת הרצת פקודת ה-SQL של הספקים ב-Supabase' : 'שמירת ההוצאה נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
+      return null;
+    }
+  };
+
+  const handleSaveSupplier = async (row: Partial<Supplier> & { name: string }) => {
+    try {
+      const saved = await dbService.saveSupplier(row);
+      setSuppliers((prev) => (prev.some((s) => s.id === saved.id) ? prev.map((s) => (s.id === saved.id ? saved : s)) : [...prev, saved]));
+      return saved;
+    } catch (err) {
+      console.error(err);
+      pushToast('שמירת הספק נכשלה. צריך להריץ את פקודת ה-SQL של הספקים ב-Supabase.', { tone: 'error', duration: 8000 });
+      return null;
     }
   };
 
@@ -950,12 +970,15 @@ export default function App() {
                 )}
 
                 {activePage === 'variable_expenses' && (
-                  <OExpenses
-                    kind="variable"
+                  <OVariable
                     expenses={variableExpenses}
+                    suppliers={suppliers}
+                    userEmail={currentUser?.email}
                     {...pageMonth}
                     onSaveExpense={handleSaveVariableExpense}
                     onDeleteExpense={handleDeleteVariableExpense}
+                    onSaveSupplier={handleSaveSupplier}
+                    onNavigate={(p: ActivePage) => setActivePage(p)}
                   />
                 )}
 

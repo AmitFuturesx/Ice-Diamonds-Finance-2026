@@ -11,7 +11,8 @@ import {
   Employee,
   EmployeeMonth,
   InvoiceUpload,
-  DailyOrders
+  DailyOrders,
+  Supplier
 } from '../types';
 
 // Retrieve environment variables
@@ -672,6 +673,57 @@ export const dbService = {
     }
     const created = { ...row, id: 'em_' + Math.random().toString(36).slice(2, 11) } as EmployeeMonth;
     saveToStorage('employee_months', [...list, created]);
+    return created;
+  },
+
+  // ---------- Suppliers of variable expenses ----------
+  async getSuppliers(): Promise<Supplier[]> {
+    if (isLiveSupabase && supabaseClient) {
+      const { data, error } = await supabaseClient.from('suppliers').select('*').eq('kind', 'variable').order('name');
+      if (error) throw error;
+      return (data as any) || [];
+    }
+    // demo: same as the SQL migration — one supplier per variable-expense name, rows linked to it
+    let list = getFromStorage<Supplier>('suppliers');
+    const rows = getFromStorage<VariableExpense>('variable_expenses');
+    let changed = false;
+    for (const r of rows) {
+      const name = String(r.name || '').trim();
+      if (!name) continue;
+      let s = list.find((x) => x.name === name);
+      if (!s) {
+        s = { id: 'sup_' + Math.random().toString(36).slice(2, 11), name, kind: 'variable', vat_exempt: false, mood: 'happy', active: true };
+        list = [...list, s];
+        changed = true;
+      }
+      if (!r.supplier_id) {
+        r.supplier_id = s.id;
+        changed = true;
+      }
+    }
+    if (changed) {
+      saveToStorage('suppliers', list);
+      saveToStorage('variable_expenses', rows);
+    }
+    return [...list].sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  },
+
+  async saveSupplier(row: Partial<Supplier> & { name: string }): Promise<Supplier> {
+    if (isLiveSupabase && supabaseClient) {
+      const payload = { kind: 'variable', ...row };
+      const query = row.id ? supabaseClient.from('suppliers').update(payload).eq('id', row.id) : supabaseClient.from('suppliers').insert([payload]);
+      const { data, error } = await query.select();
+      if (error) throw error;
+      return data[0];
+    }
+    const list = getFromStorage<Supplier>('suppliers');
+    if (row.id) {
+      const next = list.map((x) => (x.id === row.id ? ({ ...x, ...row } as Supplier) : x));
+      saveToStorage('suppliers', next);
+      return next.find((x) => x.id === row.id)!;
+    }
+    const created = { kind: 'variable', vat_exempt: false, mood: 'happy', active: true, ...row, id: 'sup_' + Math.random().toString(36).slice(2, 11) } as Supplier;
+    saveToStorage('suppliers', [...list, created]);
     return created;
   },
 
