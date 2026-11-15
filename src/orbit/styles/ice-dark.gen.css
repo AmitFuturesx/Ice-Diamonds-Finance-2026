@@ -372,6 +372,13 @@ html[data-theme='dark'] .ice-need-row.is-missing,
 html[data-theme='dark'] .ice-need-row.is-failed {
   background: #33281a;
 }
+html[data-theme='dark'] .ice-cat-tab em {
+  background: #28432c;
+}
+html[data-theme='dark'] .ice-cat-tab em.is-open {
+  background: #4a3518;
+  color: #f0b56a;
+}
 html[data-theme='dark'] .ice-need-ic {
   background: color-mix(in srgb, var(--tone) 14%, var(--card));
 }

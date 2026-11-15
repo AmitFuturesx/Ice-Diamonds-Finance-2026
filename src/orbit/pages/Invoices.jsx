@@ -123,6 +123,7 @@ export default function Invoices(props) {
   const [filter, setFilter] = useState('all')
   const [need, setNeed] = useState('missing')
   const [groupOpen, setGroupOpen] = useState(null)
+  const [catTab, setCatTab] = useState('all')
   const [page, setPage] = useState(1)
   const [drag, setDrag] = useState(false)
   const files = useRef(new Map()) // row id → File, so a failed send can be retried without picking again
@@ -190,12 +191,20 @@ export default function Invoices(props) {
     }))
   const listItems = [...withInvoice.filter((p) => p.cat !== 'variable' || bySupplier[supKey(p)].length === 1), ...groups]
   const openGroup = groups.find((g) => g.key === groupOpen)
+  const isClosed = (x) => x.inv === 'done' || x.inv === 'skipped'
+  const inCat = (x) => catTab === 'all' || x.cat === catTab
+  const catTabs = [
+    { id: 'all', label: 'הכל', open: withInvoice.filter((x) => !isClosed(x)).length },
+    ...CATS.filter((c) => withInvoice.some((x) => x.cat === c.id)).map((c) => ({ id: c.id, label: c.title, icon: c.icon, tone: c.tone, open: withInvoice.filter((x) => x.cat === c.id && !isClosed(x)).length }))
+  ]
+  const tabBase = withInvoice.filter(inCat)
   const needList = listItems
-    .filter((p) => (need === 'missing' ? p.inv !== 'done' && p.inv !== 'skipped' : need === 'done' ? p.inv === 'done' || p.inv === 'skipped' : true))
+    .filter(inCat)
+    .filter((p) => (need === 'missing' ? !isClosed(p) : need === 'done' ? isClosed(p) : true))
     .sort(
       (a, b) =>
-        Number(a.inv === 'done' || a.inv === 'skipped') - Number(b.inv === 'done' || b.inv === 'skipped') ||
         CATS.findIndex((c) => c.id === a.cat) - CATS.findIndex((c) => c.id === b.cat) ||
+        Number(isClosed(a)) - Number(isClosed(b)) ||
         (DAY_ORDER[a.dayKey] ?? 4) - (DAY_ORDER[b.dayKey] ?? 4) ||
         b.amount - a.amount
     )
@@ -400,17 +409,33 @@ export default function Invoices(props) {
             value={need}
             onChange={setNeed}
             options={[
-              { id: 'missing', label: 'חסרות', count: missing.length + withInvoice.filter((p) => p.inv === 'pending').length },
-              { id: 'done', label: 'הושלמו', count: done.length + skipped.length },
-              { id: 'all', label: 'הכל', count: payments.length }
+              { id: 'missing', label: 'חסרות', count: tabBase.filter((x) => !isClosed(x)).length },
+              { id: 'done', label: 'הושלמו', count: tabBase.filter(isClosed).length },
+              { id: 'all', label: 'הכל', count: tabBase.length }
             ]}
           />
         </CardHead>
+        <div className="ice-cat-tabs" role="tablist" aria-label="סוג תשלום">
+          {catTabs.map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={catTab === t.id} className={`ice-cat-tab ${catTab === t.id ? 'is-on' : ''}`} style={{ '--tone': t.tone || 'var(--teal)' }} onClick={() => setCatTab(t.id)}>
+              {t.icon && <Icon name={t.icon} />}
+              {t.label}
+              <em className={t.open ? 'is-open' : ''}>{t.open || '✓'}</em>
+            </button>
+          ))}
+        </div>
         <ul className="ice-need-list">
           {needList.map((p, i) => {
             const c = CAT[p.cat]
+            const header =
+              catTab === 'all' && (i === 0 || needList[i - 1].cat !== p.cat) ? (
+                <li key={`h-${p.cat}`} className="ice-need-sec" style={{ '--tone': c.tone }}>
+                  <Icon name={c.icon} /> {c.title}
+                </li>
+              ) : null
             if (p.group)
-              return (
+              return [
+                header,
                 <li key={p.uid} className={`ice-need-row is-${p.inv} is-group rv`} style={{ '--i': Math.min(i, 12), '--tone': c.tone }} role="button" tabIndex={0} onClick={() => setGroupOpen(p.key)} onKeyDown={(e) => e.key === 'Enter' && setGroupOpen(p.key)}>
                   <span className="ice-need-ic" title={c.title}>
                     <Icon name={c.icon} />
@@ -441,8 +466,10 @@ export default function Invoices(props) {
                     </span>
                   </div>
                 </li>
-              )
-            return (
+              ]
+            return [
+              header,
+              (
               <li key={p.uid} className={`ice-need-row is-${p.inv} rv`} style={{ '--i': Math.min(i, 12), '--tone': c.tone }}>
                 <span className="ice-need-ic" title={c.title}>
                   <Icon name={c.icon} />
@@ -456,7 +483,8 @@ export default function Invoices(props) {
                 </div>
                 {actionsFor(p)}
               </li>
-            )
+              )
+            ]
           })}
         </ul>
         {needList.length === 0 && (
