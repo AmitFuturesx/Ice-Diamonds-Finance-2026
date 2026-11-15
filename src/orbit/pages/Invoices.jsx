@@ -9,7 +9,7 @@ import { CardHead, Empty, Kpi, Menu, PageHead, Pager, Segmented } from '../kit'
 import { ils } from '../lib'
 import { dbService } from '../../lib/supabase'
 import { CAT, CATS, DAY_LABEL, DAY_ORDER, buildPayments } from '../payments'
-import { MonthBar } from './common'
+import { Modal, MonthBar } from './common'
 
 const PER = 12
 const MAX_BYTES = 4 * 1024 * 1024
@@ -122,6 +122,7 @@ export default function Invoices(props) {
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState('all')
   const [need, setNeed] = useState('missing')
+  const [groupOpen, setGroupOpen] = useState(null)
   const [page, setPage] = useState(1)
   const [drag, setDrag] = useState(false)
   const files = useRef(new Map()) // row id → File, so a failed send can be retried without picking again
@@ -167,7 +168,29 @@ export default function Invoices(props) {
   const missing = withInvoice.filter((p) => p.inv === 'missing' || p.inv === 'failed')
   const done = withInvoice.filter((p) => p.inv === 'done')
   const skipped = withInvoice.filter((p) => p.inv === 'skipped')
-  const needList = withInvoice
+  // several purchases from one variable supplier → one clickable row (details + uploads in a popup)
+  const supKey = (p) => String(p.raw?.supplier_id || p.name).trim()
+  const bySupplier = {}
+  for (const p of withInvoice) if (p.cat === 'variable') (bySupplier[supKey(p)] ||= []).push(p)
+  const rollup = (items) => (items.some((x) => x.inv === 'missing' || x.inv === 'failed') ? 'missing' : items.some((x) => x.inv === 'pending') ? 'pending' : items.every((x) => x.inv === 'skipped') ? 'skipped' : 'done')
+  const groups = Object.entries(bySupplier)
+    .filter(([, items]) => items.length > 1)
+    .map(([key, items]) => ({
+      uid: `vg${key}`,
+      key,
+      group: true,
+      cat: 'variable',
+      name: items[0].name,
+      amount: items.reduce((a, x) => a + x.amount, 0),
+      dayKey: items[0].dayKey,
+      items: [...items].sort((a, b) => String(a.raw?.date || '').localeCompare(String(b.raw?.date || ''))),
+      inv: rollup(items),
+      openN: items.filter((x) => x.inv === 'missing' || x.inv === 'failed').length,
+      doneN: items.filter((x) => x.inv === 'done' || x.inv === 'skipped').length
+    }))
+  const listItems = [...withInvoice.filter((p) => p.cat !== 'variable' || bySupplier[supKey(p)].length === 1), ...groups]
+  const openGroup = groups.find((g) => g.key === groupOpen)
+  const needList = listItems
     .filter((p) => (need === 'missing' ? p.inv !== 'done' && p.inv !== 'skipped' : need === 'done' ? p.inv === 'done' || p.inv === 'skipped' : true))
     .sort(
       (a, b) =>
@@ -177,6 +200,62 @@ export default function Invoices(props) {
         b.amount - a.amount
     )
   const needOf = payments.length - skipped.length
+  /** the invoice state of one payment, with its actions (upload / retry / skip) */
+  const actionsFor = (p) => (
+    <>
+      <div className="ice-need-state">
+        {p.inv === 'done' && (
+          <>
+            <span className="ice-need-badge is-done">
+              <Icon name="check" /> יש חשבונית
+            </span>
+            <span className="ice-need-file" title={p.row.file_name}>
+              {p.row.file_name}
+            </span>
+          </>
+        )}
+        {p.inv === 'pending' && (
+          <span className="ice-need-badge is-pending">
+            <span className="ice-spin" /> שולח למורנינג...
+          </span>
+        )}
+        {p.inv === 'skipped' && (
+          <>
+            <span className="ice-need-badge is-skipped">לא צריך חשבונית</span>
+            <button type="button" className="link ice-need-undo" onClick={() => removeRow(p.row)}>
+              ביטול
+            </button>
+          </>
+        )}
+        {p.inv === 'failed' && (
+          <>
+            <span className="ice-need-badge is-failed">
+              <Icon name="x" /> {p.row.error || 'השליחה נכשלה'}
+            </span>
+            <button type="button" className="btn btn--white btn--sm" onClick={() => retry(p.row)}>
+              <Icon name="refresh" /> שלח שוב
+            </button>
+          </>
+        )}
+        {p.inv === 'missing' && (
+          <>
+            <span className="ice-need-badge is-missing">חסרה חשבונית</span>
+            <button type="button" className="btn btn--primary btn--sm" onClick={() => uploadFor(p)}>
+              <Icon name="upload" /> העלאת חשבונית
+            </button>
+            <button type="button" className="link ice-need-skip" onClick={() => skip(p)} title="למשל החזר הלוואה או תשלום בלי חשבונית">
+              לא צריך
+            </button>
+          </>
+        )}
+      </div>
+      {p.inv === 'done' && (
+        <span className="ice-inv-menu">
+          <Menu items={[{ id: 'more', label: 'העלאת חשבונית נוספת', icon: 'upload', onClick: () => uploadFor(p) }]} />
+        </span>
+      )}
+    </>
+  )
 
   const patchRow = (id, patch) => setRows((list) => list.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
@@ -330,6 +409,39 @@ export default function Invoices(props) {
         <ul className="ice-need-list">
           {needList.map((p, i) => {
             const c = CAT[p.cat]
+            if (p.group)
+              return (
+                <li key={p.uid} className={`ice-need-row is-${p.inv} is-group rv`} style={{ '--i': Math.min(i, 12), '--tone': c.tone }} role="button" tabIndex={0} onClick={() => setGroupOpen(p.key)} onKeyDown={(e) => e.key === 'Enter' && setGroupOpen(p.key)}>
+                  <span className="ice-need-ic" title={c.title}>
+                    <Icon name={c.icon} />
+                  </span>
+                  <div className="ice-need-main">
+                    <p className="ice-pop-name">
+                      <b>{p.name}</b>
+                      <span className="ice-pop-amt">{ils(p.amount)}</span>
+                    </p>
+                    <span className="ice-pop-where">
+                      {c.title} · {p.items.length} רכישות החודש · {p.doneN} מתוך {p.items.length} עם חשבונית
+                    </span>
+                  </div>
+                  <div className="ice-need-state">
+                    {p.openN > 0 ? (
+                      <span className="ice-need-badge is-missing">{p.openN === 1 ? 'חסרה חשבונית' : `חסרות ${p.openN} חשבוניות`}</span>
+                    ) : p.inv === 'pending' ? (
+                      <span className="ice-need-badge is-pending">
+                        <span className="ice-spin" /> שולח...
+                      </span>
+                    ) : (
+                      <span className="ice-need-badge is-done">
+                        <Icon name="check" /> כל החשבוניות
+                      </span>
+                    )}
+                    <span className={`btn btn--sm ${p.openN ? 'btn--primary' : 'btn--white'}`}>
+                      <Icon name="layers" /> {p.openN ? 'פירוט והעלאה' : 'פירוט'}
+                    </span>
+                  </div>
+                </li>
+              )
             return (
               <li key={p.uid} className={`ice-need-row is-${p.inv} rv`} style={{ '--i': Math.min(i, 12), '--tone': c.tone }}>
                 <span className="ice-need-ic" title={c.title}>
@@ -342,57 +454,7 @@ export default function Invoices(props) {
                   </p>
                   <span className="ice-pop-where">{[c.title, p.cat !== 'variable' && p.dayKey && p.dayKey !== 'unknown' ? DAY_LABEL[p.dayKey] : null, p.sub].filter(Boolean).join(' · ')}</span>
                 </div>
-                <div className="ice-need-state">
-                  {p.inv === 'done' && (
-                    <>
-                      <span className="ice-need-badge is-done">
-                        <Icon name="check" /> יש חשבונית
-                      </span>
-                      <span className="ice-need-file" title={p.row.file_name}>
-                        {p.row.file_name}
-                      </span>
-                    </>
-                  )}
-                  {p.inv === 'pending' && (
-                    <span className="ice-need-badge is-pending">
-                      <span className="ice-spin" /> שולח למורנינג...
-                    </span>
-                  )}
-                  {p.inv === 'skipped' && (
-                    <>
-                      <span className="ice-need-badge is-skipped">לא צריך חשבונית</span>
-                      <button type="button" className="link ice-need-undo" onClick={() => removeRow(p.row)}>
-                        ביטול
-                      </button>
-                    </>
-                  )}
-                  {p.inv === 'failed' && (
-                    <>
-                      <span className="ice-need-badge is-failed">
-                        <Icon name="x" /> {p.row.error || 'השליחה נכשלה'}
-                      </span>
-                      <button type="button" className="btn btn--white btn--sm" onClick={() => retry(p.row)}>
-                        <Icon name="refresh" /> שלח שוב
-                      </button>
-                    </>
-                  )}
-                  {p.inv === 'missing' && (
-                    <>
-                      <span className="ice-need-badge is-missing">חסרה חשבונית</span>
-                      <button type="button" className="btn btn--primary btn--sm" onClick={() => uploadFor(p)}>
-                        <Icon name="upload" /> העלאת חשבונית
-                      </button>
-                      <button type="button" className="link ice-need-skip" onClick={() => skip(p)} title="למשל החזר הלוואה או תשלום בלי חשבונית">
-                        לא צריך
-                      </button>
-                    </>
-                  )}
-                </div>
-                {p.inv === 'done' && (
-                  <span className="ice-inv-menu">
-                    <Menu items={[{ id: 'more', label: 'העלאת חשבונית נוספת', icon: 'upload', onClick: () => uploadFor(p) }]} />
-                  </span>
-                )}
+                {actionsFor(p)}
               </li>
             )
           })}
@@ -406,6 +468,47 @@ export default function Invoices(props) {
         )}
         <input ref={itemPickRef} type="file" accept="application/pdf,image/*" hidden onChange={onItemPicked} />
       </section>
+
+      {openGroup && (
+        <Modal label={openGroup.name} onClose={() => setGroupOpen(null)} className="ice-pop">
+          {(close) => (
+            <div className="ice-pop-in" style={{ '--tone': CAT.variable.tone }}>
+              <header className="ice-pop-head">
+                <span className="ice-cat-ic">
+                  <Icon name={CAT.variable.icon} />
+                </span>
+                <div>
+                  <h2>{openGroup.name}</h2>
+                  <p>
+                    {openGroup.items.length} רכישות החודש · סה״כ {ils(openGroup.amount)} · {openGroup.doneN} מתוך {openGroup.items.length} עם חשבונית
+                  </p>
+                </div>
+                <button type="button" className="icon-btn icon-btn--soft ice-pop-x" onClick={close} aria-label="סגירה">
+                  <Icon name="x" />
+                </button>
+              </header>
+              <ul className="ice-need-list ice-group-list">
+                {openGroup.items.map((p) => (
+                  <li key={p.uid} className={`ice-need-row is-${p.inv}`} style={{ '--tone': CAT.variable.tone }}>
+                    <span className="ice-need-ic">
+                      <Icon name="receipt" />
+                    </span>
+                    <div className="ice-need-main">
+                      <p className="ice-pop-name">
+                        <b>{p.raw?.description || 'רכישה'}</b>
+                        <span className="ice-pop-amt">{ils(p.amount)}</span>
+                      </p>
+                      <span className="ice-pop-where">{p.raw?.date ? `${String(p.raw.date).slice(8, 10)}/${String(p.raw.date).slice(5, 7)}` : 'בלי תאריך'}</span>
+                    </div>
+                    {actionsFor(p)}
+                  </li>
+                ))}
+              </ul>
+              <p className="ice-inv-note">כל רכישה מקבלת חשבונית משלה, והיא נשלחת למורנינג. רכישות חדשות מוסיפים בעמוד הוצאות משתנות.</p>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {/* ---------- 2. loose upload ---------- */}
       <section
