@@ -162,3 +162,18 @@ html[data-theme='dark'] .border-slate-200 {
 html[data-theme='dark'] .ice-theme-btn .icon {
   rotate: -25deg;
 }
+
+/* chart bubbles: light text on a light bubble in dark mode */
+html[data-theme='dark'] .tk-tip,
+html[data-theme='dark'] .bc-tip,
+html[data-theme='dark'] .member-tip,
+html[data-theme='dark'] .sv-tip {
+  background: #34424c;
+  color: #fff;
+}
+html[data-theme='dark'] .tk-tip b,
+html[data-theme='dark'] .tk-tip span,
+html[data-theme='dark'] .bc-tip b,
+html[data-theme='dark'] .bc-tip span {
+  color: #fff;
+}

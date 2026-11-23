@@ -22,17 +22,26 @@ export const UNPAID = 'לא שולם'
 
 const n0 = (v) => Number(v) || 0
 export const bucketKey = (n) => (n == null || isNaN(n) ? 'unknown' : String([10, 15, 19].reduce((p, c) => (Math.abs(c - n) < Math.abs(p - n) ? c : p))))
+/** total / paid / left of any list ("שולם חלקית" still counts as left, in full) */
+export function totals(list) {
+  const total = list.reduce((a, o) => a + o.amount, 0)
+  const paid = list.filter((o) => o.status === 'שולם').reduce((a, o) => a + o.amount, 0)
+  return { total, paid, left: total - paid }
+}
 export const fmtDate = (s) => {
   if (!s) return ''
   const p = String(s).split('-')
   return p.length === 3 ? `${p[2]}/${p[1]}` : s
 }
 
+/** A real purchase. Old ₪0 lines without a description are just the supplier's name from before suppliers existed: kept in the DB, not shown. */
+export const isPurchase = (e) => n0(e.amount) > 0 || Boolean(e.description)
+
 /** empMonthById: { [employee_id]: EmployeeMonth } for the open month */
 export function buildPayments({ fixedExpenses = [], variableExpenses = [], employees = [], empMonthById = {}, debts = [], deliveries = [] }) {
   return [
     ...fixedExpenses.map((e) => ({ uid: `f${e.id}`, cat: 'fixed', id: e.id, name: e.name, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.payment_date ? parseInt(e.payment_date, 10) : NaN), mood: e.mood || 'happy', raw: e })),
-    ...variableExpenses.map((e) => ({ uid: `v${e.id}`, cat: 'variable', id: e.id, name: e.name, sub: [e.date ? fmtDate(e.date) : null, e.description].filter(Boolean).join(' · ') || undefined, amount: n0(e.amount), status: e.status || UNPAID, dayKey: bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
+    ...variableExpenses.filter(isPurchase).map((e) => ({ uid: `v${e.id}`, cat: 'variable', id: e.id, name: e.name, sub: [e.date ? fmtDate(e.date) : null, e.description].filter(Boolean).join(' · ') || undefined, amount: n0(e.amount), status: e.status || UNPAID, dayKey: e.payment_day ? bucketKey(parseInt(e.payment_day, 10)) : bucketKey(e.date ? parseInt(String(e.date).split('-')[2], 10) : NaN), mood: e.mood || 'happy', raw: e })),
     ...employees
       .filter((e) => e.active !== false)
       .map((e) => ({ uid: `p${e.id}`, cat: 'payroll', id: e.id, name: e.name, sub: e.role, dayKey: bucketKey(e.payment_day ? parseInt(e.payment_day, 10) : NaN), amount: computePay(e, empMonthById[e.id], employees, empMonthById).total, status: empMonthById[e.id]?.status || UNPAID, raw: e })),

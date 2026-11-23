@@ -34,6 +34,14 @@ export async function guard(request) {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
   if (allowed.length && !allowed.includes(email)) return fail(403, 'למשתמש הזה אין הרשאה')
+  const base = process.env.VITE_SUPABASE_URL.replace(/\/$/, '')
+  const m = await fetch(`${base}/rest/v1/rpc/is_member`, {
+    method: 'POST',
+    headers: { apikey: process.env.VITE_SUPABASE_ANON_KEY, Authorization: request.headers.get('authorization'), 'Content-Type': 'application/json' },
+    body: '{}'
+  })
+  if (m.status === 404) return null // the members SQL has not run yet
+  if (!m.ok || (await m.json().catch(() => false)) !== true) return fail(403, 'למשתמש הזה אין הרשאה')
   return null
 }
 

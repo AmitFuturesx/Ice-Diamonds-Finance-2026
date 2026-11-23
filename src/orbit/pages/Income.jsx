@@ -198,7 +198,7 @@ export default function Income(props) {
               close={close}
               onDelete={form.id ? () => onDeleteIncome(form.id) : null}
               onSave={async (v) => {
-                const base = { source: v.source, amount: v.amount, channel: 'חודשי', date: v.date || new Date().toISOString().split('T')[0] }
+                const base = { source: v.source, amount: v.amount, channel: 'חודשי', date: v.date || new Date().toLocaleDateString('sv-SE') }
                 if (form.id) await onSaveIncome({ ...form, ...base })
                 else await onSaveIncome({ month_id: activeMonthId, ...base })
                 notify?.(form.id ? 'ההכנסה עודכנה' : `נוספה הכנסה: ${ils(v.amount)}`, { tone: 'success' })

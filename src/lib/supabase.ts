@@ -97,7 +97,7 @@ const INITIAL_DELIVERIES: Delivery[] = [
 
 // LocalStorage Helper Initializer
 const initializeLocalStorage = () => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || isLiveSupabase) return; // sample rows never land in a live browser
   if (!localStorage.getItem('icediamonds_months')) {
     localStorage.setItem('icediamonds_months', JSON.stringify(INITIAL_MONTHS));
     localStorage.setItem('icediamonds_fixed_expenses', JSON.stringify(INITIAL_FIXED_EXPENSES));
@@ -105,7 +105,6 @@ const initializeLocalStorage = () => {
     localStorage.setItem('icediamonds_debts', JSON.stringify(INITIAL_DEBTS));
     localStorage.setItem('icediamonds_income', JSON.stringify(INITIAL_INCOME));
     localStorage.setItem('icediamonds_deliveries', JSON.stringify(INITIAL_DELIVERIES));
-    localStorage.setItem('icediamonds_user', JSON.stringify({ email: 'amitshop23@gmail.com' }));
   }
 };
 
@@ -144,19 +143,11 @@ export const dbService = {
       if (error) return { success: false, error: error.message };
       return { success: true, user: data.user };
     } else {
-      // Mock validation with secure environment variables if configured
-      const emailLower = emailValue.trim().toLowerCase();
-      
-      const allowedUser1 = ((import.meta as any).env?.VITE_STAGING_USER_1 || 'amitshop23@gmail.com').trim().toLowerCase();
-      const allowedUser2 = ((import.meta as any).env?.VITE_STAGING_USER_2 || 'dne@hasharon.diamonds').trim().toLowerCase();
-      const allowedPassword = (import.meta as any).env?.VITE_STAGING_PASSWORD || '123456';
-
-      if ((emailLower === allowedUser1 || emailLower === allowedUser2) && passwordValue === allowedPassword) {
-        const user = { email: emailLower };
-        localStorage.setItem('icediamonds_logged_in_user', JSON.stringify(user));
-        return { success: true, user };
-      }
-      return { success: false, error: 'דוא״ל או סיסמה שגויים.' };
+      // local demo only (npm run dev without keys): a live build without keys refuses everyone
+      if (!(import.meta as any).env?.DEV) return { success: false, error: 'המערכת לא מחוברת למסד הנתונים' };
+      const user = { email: emailValue.trim().toLowerCase() };
+      localStorage.setItem('icediamonds_logged_in_user', JSON.stringify(user));
+      return { success: true, user };
     }
   },
 

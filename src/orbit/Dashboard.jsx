@@ -37,7 +37,6 @@ const n0 = (v) => Number(v) || 0
 const pl = (n, one, many) => `${n} ${n === 1 ? one : many}`
 const isPaid = (o) => o.status === PAID
 const sumOf = (list) => list.reduce((a, o) => a + o.amount, 0)
-const pad2 = (n) => String(n).padStart(2, '0')
 const monthLabel = (m) => (m ? (m.name.includes(String(m.year)) ? m.name : `${m.name} ${m.year}`) : '')
 /** Totals of a list: everything, what is still open (incl. partly paid) and what is fully paid. */
 const stats = (list) => {
@@ -125,9 +124,8 @@ export default function Dashboard(props) {
     if (o.cat === 'fixed') save(o, { payment_date: unknown ? '' : d })
     else if (o.cat === 'debt') save(o, { payment_date: unknown ? 'לא סומן' : d })
     else if (o.cat === 'variable') {
-      const y = activeMonth?.year || new Date().getFullYear()
-      const m = activeMonth?.month_number || new Date().getMonth() + 1
-      save(o, { date: unknown ? '' : `${y}-${pad2(m)}-${pad2(d)}` })
+      // `date` is when it was bought and is never touched; payment_day is when it gets paid
+      save(o, { payment_day: d })
     } else if (o.cat === 'delivery') save(o, { payment_day: unknown ? '' : d })
     else if (o.cat === 'payroll') onSaveEmployee?.({ ...o.raw, payment_day: unknown ? '' : d })
     notify?.(unknown ? `הוסר התאריך של ${o.name}` : `${o.name} · לתשלום ב־${d} לחודש`, { tone: 'success' })
@@ -275,7 +273,7 @@ export default function Dashboard(props) {
             <b>
               <Money v={profit} d={5} />
             </b>
-            <small>{income ? `${Math.round((profit / income) * 100)}% מההכנסות נשארו בעסק` : 'הכנסות פחות הוצאות'}</small>
+            <small>{profit < 0 && income ? 'ההוצאות גבוהות מההכנסות' : income ? `${Math.round((profit / income) * 100)}% מההכנסות נשארו בעסק` : 'הכנסות פחות הוצאות'}</small>
           </div>
         </div>
       </section>

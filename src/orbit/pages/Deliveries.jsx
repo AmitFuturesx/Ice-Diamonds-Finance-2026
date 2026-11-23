@@ -166,7 +166,7 @@ export default function Deliveries(props) {
               close={close}
               onDelete={form.id ? () => onDeleteDelivery(form.id) : null}
               onSave={async (v) => {
-                const base = { date: v.date || new Date().toISOString().split('T')[0], route_from: v.from, route_to: v.to, price: v.price, notes: v.notes }
+                const base = { date: v.date || new Date().toLocaleDateString('sv-SE'), route_from: v.from, route_to: v.to, price: v.price, notes: v.notes }
                 if (form.id) await onSaveDelivery({ ...form, ...base })
                 else await onSaveDelivery({ month_id: activeMonthId, ...base })
                 notify?.(form.id ? 'השליחות עודכנה' : 'נוספה שליחות', { tone: 'success' })

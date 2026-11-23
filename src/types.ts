@@ -28,6 +28,7 @@ export interface VariableExpense {
   status: PaymentStatus;
   mood?: string; // Vendor patience: 'happy' | 'neutral' | 'angry'
   // one purchase from a supplier (supabase/migrations/2026-11-15_suppliers.sql)
+  payment_day?: string | null; // when it gets paid, if not by the purchase date ('10' / '15' / '19' / 'unknown')
   supplier_id?: string | null;
   description?: string | null;
   vat_amount?: number | null; // VAT part of amount (amount is the total incl. VAT)

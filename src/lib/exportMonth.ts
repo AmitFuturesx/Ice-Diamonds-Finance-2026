@@ -1,4 +1,8 @@
-import type { FixedExpense, VariableExpense, Debt, IncomeEntry, Delivery } from '../types';
+import type { FixedExpense, VariableExpense, Debt, IncomeEntry, Delivery, Employee, EmployeeMonth } from '../types';
+import { computePay, VAT_RATE } from './payroll';
+import { CATS, DAYS, buildPayments, isPurchase, totals } from '../orbit/payments';
+
+const VAT_LABEL = `${Math.round(VAT_RATE * 100)}%`;
 
 export interface MonthExportData {
   monthLabel: string; // e.g. "אוקטובר 2026"
@@ -7,6 +11,8 @@ export interface MonthExportData {
   debts: Debt[];
   incomeEntries: IncomeEntry[];
   deliveries: Delivery[];
+  employees: Employee[];
+  employeeMonths: EmployeeMonth[];
 }
 
 const ILS = '#,##0 ₪';
@@ -22,7 +28,6 @@ const billingBucket = (day: number): string =>
     : `${BILLING_DAYS.reduce((p, c) => (Math.abs(c - day) < Math.abs(p - day) ? c : p))} לחודש`;
 
 const dayFromText = (t?: string | null) => (t ? parseInt(t, 10) : NaN);
-const dayFromDate = (d?: string | null) => (d ? parseInt(d.split('-')[2], 10) : NaN);
 
 const fmtDate = (d?: string | null) => {
   if (!d) return '';
@@ -82,17 +87,14 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
   // ---------- Totals ----------
   const totalIncome = sum(data.incomeEntries, (i) => num(i.amount));
   const totalFixed = sum(data.fixedExpenses, (e) => num(e.amount));
-  const totalVariable = sum(data.variableExpenses, (e) => num(e.amount));
+  const purchases = data.variableExpenses.filter(isPurchase);
+  const totalVariable = sum(purchases, (e) => num(e.amount));
   const totalDebts = sum(data.debts, (d) => num(d.monthly_payment));
-  const totalExpenses = totalFixed + totalVariable + totalDebts;
-
-  // Every obligation with its status + billing bucket
-  const obligations = [
-    ...data.fixedExpenses.map((e) => ({ amt: num(e.amount), status: e.status, bucket: billingBucket(dayFromText(e.payment_date)) })),
-    ...data.variableExpenses.map((e) => ({ amt: num(e.amount), status: e.status, bucket: billingBucket(dayFromDate(e.date)) })),
-    ...data.debts.map((d) => ({ amt: num(d.monthly_payment), status: d.status || 'לא שולם', bucket: billingBucket(dayFromText(d.payment_date)) }))
-  ];
-  const paid = sum(obligations.filter((o) => o.status === 'שולם'), (o) => o.amt);
+  const byEmp: Record<string, EmployeeMonth> = Object.fromEntries(data.employeeMonths.map((m) => [m.employee_id, m]));
+  // the dashboard's own list (incl. payroll and deliveries), so the file and the screen always agree
+  const payments: any[] = buildPayments({ ...data, empMonthById: byEmp } as any);
+  const everything = totals(payments);
+  const totalExpenses = everything.total;
 
   // ---------- Sheet 1: summary ----------
   const summary = wb.addWorksheet('סיכום', { views: [{ rightToLeft: true }] });
@@ -114,9 +116,7 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
 
   section('מאזן החודש');
   line('סה״כ הכנסות', totalIncome);
-  line('הוצאות קבועות', totalFixed);
-  line('הוצאות משתנות', totalVariable);
-  line('החזרי חובות והלוואות', totalDebts);
+  CATS.forEach((c: any) => line(c.title, totals(payments.filter((p) => p.cat === c.id)).total));
   line('סה״כ הוצאות', totalExpenses);
   const net = summary.addRow(['מאזן נטו (הכנסות פחות הוצאות)', totalIncome - totalExpenses]);
   net.font = { bold: true, color: { argb: totalIncome - totalExpenses >= 0 ? 'FF16A34A' : 'FFDC2626' } };
@@ -125,20 +125,16 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
 
   section('מצב תשלומים');
   line('סה״כ לתשלום החודש', totalExpenses);
-  line('כבר שולם', paid);
-  line('נותר לשלם', totalExpenses - paid);
+  line('כבר שולם', everything.paid);
+  line('נותר לשלם', everything.left);
   summary.addRow([]);
 
   section('לפי יום חיוב');
   const bucketHead = summary.addRow(['יום חיוב', 'סה״כ', 'נותר לשלם']);
   bucketHead.font = { bold: true };
-  ['10 לחודש', '15 לחודש', '19 לחודש', 'לא ידוע'].forEach((b) => {
-    const inB = obligations.filter((o) => o.bucket === b);
-    const r = summary.addRow([
-      b,
-      sum(inB, (o) => o.amt),
-      sum(inB.filter((o) => o.status !== 'שולם'), (o) => o.amt)
-    ]);
+  DAYS.forEach((d: any) => {
+    const t = totals(payments.filter((p) => p.dayKey === d.key));
+    const r = summary.addRow([d.label, t.total, t.left]);
     r.getCell(2).numFmt = ILS;
     r.getCell(3).numFmt = ILS;
   });
@@ -165,25 +161,24 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
     { name: 'סה״כ', amount: totalFixed }
   );
 
-  // ---------- Sheet 3: variable expenses ----------
+  // ---------- Sheet 3: variable expenses (one row = one purchase) ----------
   addSheet(
     'הוצאות משתנות',
     [
-      { header: 'שם ההוצאה', key: 'name', width: 28 },
-      { header: 'סכום', key: 'amount', width: 14, money: true },
-      { header: 'יום חיוב', key: 'day', width: 14 },
+      { header: 'ספק', key: 'name', width: 26 },
+      { header: 'תאריך', key: 'date', width: 14 },
+      { header: 'מה נקנה', key: 'desc', width: 30 },
+      { header: 'לפני מע״מ', key: 'net', width: 14, money: true },
+      { header: 'מע״מ', key: 'vat', width: 12, money: true },
+      { header: 'סה״כ', key: 'amount', width: 14, money: true },
       { header: 'סטטוס', key: 'status', width: 14 },
       { header: 'מצב הספק', key: 'mood', width: 16 },
-      { header: 'הערות', key: 'notes', width: 40 }
+      { header: 'הערות', key: 'notes', width: 32 }
     ],
-    data.variableExpenses.map((e) => ({
-      name: e.name,
-      amount: num(e.amount),
-      day: billingBucket(dayFromDate(e.date)),
-      status: e.status,
-      mood: MOOD_LABEL[e.mood || 'happy'],
-      notes: e.notes || ''
-    })),
+    purchases.map((e) => {
+      const vat = e.vat_amount != null ? num(e.vat_amount) : num(e.amount) - num(e.amount) / (1 + VAT_RATE);
+      return { name: e.name, date: fmtDate(e.date), desc: e.description || '', net: num(e.amount) - vat, vat, amount: num(e.amount), status: e.status, mood: MOOD_LABEL[e.mood || 'happy'], notes: e.notes || '' };
+    }),
     { name: 'סה״כ', amount: totalVariable }
   );
 
@@ -239,7 +234,7 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
       { header: 'מוצא', key: 'from', width: 18 },
       { header: 'יעד', key: 'to', width: 18 },
       { header: 'מחיר נטו', key: 'net', width: 14, money: true },
-      { header: 'כולל מע״מ (17%)', key: 'gross', width: 16, money: true },
+      { header: `כולל מע״מ (${VAT_LABEL})`, key: 'gross', width: 16, money: true },
       { header: 'הערות', key: 'notes', width: 36 }
     ],
     data.deliveries.map((d) => ({
@@ -247,10 +242,29 @@ export async function exportMonthToExcel(data: MonthExportData): Promise<void> {
       from: d.route_from,
       to: d.route_to,
       net: num(d.price),
-      gross: num(d.price) * 1.17,
+      gross: num(d.price) * (1 + VAT_RATE),
       notes: d.notes || ''
     })),
-    { date: 'סה״כ', net: deliveriesNet, gross: deliveriesNet * 1.17 }
+    { date: 'סה״כ', net: deliveriesNet, gross: deliveriesNet * (1 + VAT_RATE) }
+  );
+
+  // ---------- Sheet 7: payroll ----------
+  addSheet(
+    'שכר',
+    [
+      { header: 'שם', key: 'name', width: 24 },
+      { header: 'תפקיד', key: 'role', width: 20 },
+      { header: 'לפני מע״מ', key: 'sub', width: 14, money: true },
+      { header: 'מע״מ', key: 'vat', width: 12, money: true },
+      { header: 'לתשלום', key: 'total', width: 14, money: true },
+      { header: 'סטטוס', key: 'status', width: 14 }
+    ],
+    data.employees
+      .filter((e) => e.active !== false)
+      .map((e) => {
+        const p = computePay(e, byEmp[e.id], data.employees, byEmp);
+        return { name: e.name, role: e.role, sub: p.subtotal, vat: p.vat, total: p.total, status: byEmp[e.id]?.status || 'לא שולם' };
+      })
   );
 
   // ---------- Download ----------

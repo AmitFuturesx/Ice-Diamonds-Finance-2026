@@ -16,6 +16,7 @@ import {
 import { dbService, isLiveSupabase } from './lib/supabase';
 import { exportMonthToExcel } from './lib/exportMonth';
 import { computePay, VAT_RATE } from './lib/payroll';
+import { isPurchase } from './orbit/payments';
 import LoginView from './components/LoginView';
 import BrandLogo from './components/BrandLogo';
 import OrbitDashboard from './orbit/Dashboard';
@@ -128,6 +129,8 @@ export default function App() {
   }, [theme]);
   const toggleTheme = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Authentication check on startup
   useEffect(() => {
@@ -176,8 +179,10 @@ export default function App() {
   // Fetch month data when month selection changes
   useEffect(() => {
     if (!currentUser || !activeMonthId) return;
+    let alive = true;
     const loadAllMonthData = async () => {
       setIsLoadingData(true);
+      setLoadFailed(false);
       try {
         const [fixed, variable, debtItems, incomeItems, deliveryItems] = await Promise.all([
           dbService.getFixedExpenses(activeMonthId),
@@ -187,6 +192,7 @@ export default function App() {
           dbService.getDeliveries(activeMonthId)
         ]);
 
+        if (!alive) return; // the user already moved to another month
         setFixedExpenses(fixed);
         setVariableExpenses(variable);
         setDebts(debtItems);
@@ -194,12 +200,16 @@ export default function App() {
         setDeliveries(deliveryItems);
       } catch (err) {
         console.error('Error fetching details for month: ', activeMonthId, err);
+        if (alive) setLoadFailed(true); // never show ₪0 as if it were real
       } finally {
-        setIsLoadingData(false);
+        if (alive) setIsLoadingData(false);
       }
     };
     loadAllMonthData();
-  }, [currentUser, activeMonthId]);
+    return () => {
+      alive = false;
+    };
+  }, [currentUser, activeMonthId, reloadKey]);
 
   // Payroll loads separately so a payroll problem never blocks the finance data
   useEffect(() => {
@@ -210,20 +220,28 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser || !activeMonthId) return;
+    let alive = true;
     dbService
       .getEmployeeMonths(activeMonthId)
-      .then(setEmployeeMonths)
+      .then((rows) => alive && setEmployeeMonths(rows))
       .catch((err) => console.error('Error loading payroll month', err));
+    return () => {
+      alive = false;
+    };
   }, [currentUser, activeMonthId]);
 
   // Daily orders load on their own too: a missing table never blocks the month
   useEffect(() => {
     if (!currentUser || !activeMonthId) return;
+    let alive = true;
     setDailyOrders([]);
     dbService
       .getDailyOrders(activeMonthId)
-      .then(setDailyOrders)
+      .then((rows) => alive && setDailyOrders(rows))
       .catch((err) => console.error('Error loading daily orders', err));
+    return () => {
+      alive = false;
+    };
   }, [currentUser, activeMonthId]);
 
   // Show the overdue-payment toast once per app load, when data first reveals
@@ -256,7 +274,9 @@ export default function App() {
         variableExpenses,
         debts,
         incomeEntries,
-        deliveries
+        deliveries,
+        employees,
+        employeeMonths
       });
     } catch (err) {
       console.error(err);
@@ -274,7 +294,7 @@ export default function App() {
 
   // Add a new month via the month + year picker.
   // Fixed expenses carry over (with their amounts, reset to "לא שולם");
-  // variable expenses start empty so each month is filled in fresh.
+  // variable expenses are NOT copied: suppliers are permanent and show ₪0 until a purchase is added.
   const handleAddMonthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -293,18 +313,15 @@ export default function App() {
       // most line items — so a new month always inherits the complete list,
       // regardless of which month is currently selected. Fetched fresh from the DB.
       let srcFixed = fixedExpenses;
-      let srcVariable = variableExpenses;
       // Debts carry forward from the PREVIOUS month with a "smart" balance reduction
       let srcDebts: Debt[] = [];
       try {
-        const [fixedByMonth, variableByMonth, debtsByMonth] = await Promise.all([
+        const [fixedByMonth, debtsByMonth] = await Promise.all([
           Promise.all(months.map(m => dbService.getFixedExpenses(m.id))),
-          Promise.all(months.map(m => dbService.getVariableExpenses(m.id))),
           Promise.all(months.map(m => dbService.getDebts(m.id)))
         ]);
         // Pick the month that has the most items for each category
         srcFixed = fixedByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcFixed);
-        srcVariable = variableByMonth.reduce((best, cur) => (cur.length > best.length ? cur : best), [] as typeof srcVariable);
 
         // For debts, use the closest EARLIER month that has debts, so the balance
         // reduction chains month-by-month (June -> July -> ...).
@@ -331,21 +348,6 @@ export default function App() {
             notes: fe.notes,
             status: 'לא שולם',
             payment_date: fe.payment_date
-          })
-        )
-      );
-
-      // Carry the variable expenses as a template: keep name, billing day and
-      // notes, but ZERO the amount so it's filled in fresh each month.
-      await Promise.all(
-        srcVariable.map(ve =>
-          dbService.saveVariableExpense({
-            month_id: added.id,
-            name: ve.name,
-            amount: 0,
-            notes: ve.notes,
-            date: ve.date,
-            status: 'לא שולם'
           })
         )
       );
@@ -451,6 +453,7 @@ export default function App() {
       });
     } catch (err) {
       console.error(err);
+      pushToast('שמירת ההוצאה נכשלה, נסה שוב', { tone: 'error', duration: 7000 });
     }
   };
 
@@ -481,7 +484,7 @@ export default function App() {
     } catch (err) {
       console.error(err);
       const msg = String((err as { message?: string })?.message || '');
-      pushToast(/supplier_id|description|vat_amount/.test(msg) ? 'שמירת הרכישה דורשת הרצת פקודת ה-SQL של הספקים ב-Supabase' : 'שמירת ההוצאה נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
+      pushToast(/payment_day/.test(msg) ? 'קביעת יום תשלום לרכישה דורשת הרצת פקודת SQL קצרה ב-Supabase' : 'שמירת ההוצאה נכשלה, נסה שוב', { tone: 'error', duration: 8000 });
       return null;
     }
   };
@@ -523,6 +526,7 @@ export default function App() {
       });
     } catch (err) {
       console.error(err);
+      pushToast('שמירת החוב נכשלה, נסה שוב', { tone: 'error', duration: 7000 });
     }
   };
 
@@ -660,7 +664,7 @@ export default function App() {
       );
     } catch (err) {
       console.error(err);
-      alert('שמירת נתוני החודש נכשלה.');
+      pushToast('שמירת נתוני השכר נכשלה, נסה שוב', { tone: 'error', duration: 7000 });
     }
   };
 
@@ -700,7 +704,7 @@ export default function App() {
   const paidPctAll = owedAll > 0 ? Math.round((paidAll / owedAll) * 100) : 0;
   const navBadges: Record<string, { n: number; hot?: boolean } | undefined> = {
     fixed_expenses: unpaidOf(fixedExpenses) ? { n: unpaidOf(fixedExpenses) } : undefined,
-    variable_expenses: unpaidOf(variableExpenses) ? { n: unpaidOf(variableExpenses) } : undefined,
+    variable_expenses: unpaidOf(variableExpenses.filter(isPurchase)) ? { n: unpaidOf(variableExpenses.filter(isPurchase)) } : undefined,
     debts: unpaidOf(debts) ? { n: unpaidOf(debts), hot: debts.some((d) => d.mood === 'angry' && d.status !== 'שולם') } : undefined,
     employees: employees.length ? { n: employees.length } : undefined
   };
@@ -927,6 +931,13 @@ export default function App() {
                 <BrandLogo size={48} cutout="#ffffff" className="animate-pulse" />
                 <p>טוען את נתוני החודש...</p>
               </div>
+            ) : loadFailed ? (
+              <div className="card ice-loading">
+                <p>לא הצלחנו לטעון את נתוני החודש. הנתונים עצמם לא נפגעו.</p>
+                <button className="btn btn--primary" onClick={() => setReloadKey((k) => k + 1)}>
+                  ניסיון נוסף
+                </button>
+              </div>
             ) : (
               <>
                 {activePage === 'dashboard' && (
@@ -1125,7 +1136,7 @@ export default function App() {
               הוספת חודש שקיפות חדש
             </h3>
             <p className="text-xs text-slate-500 leading-snug">
-              בחר חודש ושנה. ההוצאות הקבועות יועתקו אוטומטית עם הסכומים שלהן, וההוצאות המשתנות יתחילו ריקות למילוי מחדש.
+              בחר חודש ושנה. ההוצאות הקבועות יועתקו אוטומטית עם הסכומים שלהן, והספקים של ההוצאות המשתנות יתחילו מ-₪0.
             </p>
 
             <form onSubmit={handleAddMonthSubmit} className="space-y-4 pt-1">
